@@ -14,6 +14,10 @@ const variants = {
   edge: (m) => m,
   firefox: (m) => ({
     ...m,
+    background: {
+      scripts: ['background.js'],
+      type: 'module',
+    },
     browser_specific_settings: {
       gecko: {
         id: 'ctm-importer@colorthemap.app',

@@ -25,7 +25,6 @@ const variants = {
       },
     },
   }),
-  safari: (m) => m,
 };
 
 if (!existsSync(chromeDir)) {

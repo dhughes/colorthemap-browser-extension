@@ -12,8 +12,9 @@ This branch is the **project scaffold only** — Manifest V3 shell, build pipeli
 
 - TypeScript + Vite (multi-entry build)
 - Vitest for unit tests
-- `webextension-polyfill` so the same source builds against Chrome, Edge, Firefox, and Safari
+- `webextension-polyfill` so the same source builds against Chrome, Edge, and Firefox
 - Single `manifest.base.json`; `scripts/build-manifests.mjs` fans it out into per-browser `dist/` folders
+- Safari is deferred to a follow-up issue (see [#5](https://github.com/dhughes/colorthemap-browser-extension/issues/5)) because its toolchain (Xcode + converter + signing) was disproportionate complexity for the scaffold milestone.
 
 ## Layout
 
@@ -39,11 +40,10 @@ public/             # static assets copied as-is into each dist (icons go here)
 
 ```sh
 npm install
-npm run build           # vite build + write per-browser manifests under dist/
-npm test                # vitest
-npm run dev             # vite build --watch
-npm run package         # build + zip artifacts/{chrome,edge,firefox}.zip + Safari Xcode project (macOS only)
-npm run package:safari  # just regenerate dist/safari-xcode/ (macOS only)
+npm run build       # vite build + write per-browser manifests under dist/
+npm test            # vitest
+npm run dev         # vite build --watch
+npm run package     # build + zip artifacts/{chrome,edge,firefox}.zip
 ```
 
 ### Load the unpacked extension
@@ -97,57 +97,16 @@ After a code change: `npm run build`, then in `about:debugging` click **Reload**
 
 #### Safari
 
-Safari does not load WebExtensions directly from a folder. Apple's policy is that every Safari extension ships inside a host macOS or iOS app. The build pipeline handles the converter step for you (on macOS):
-
-```sh
-npm run package:safari
-```
-
-This calls `xcrun safari-web-extension-converter` under the hood with non-interactive flags (`--force --no-open --swift`) and writes an Xcode project to `dist/safari-xcode/Color The Map Importer/`. The host macOS app it generates has one job: register the extension with Safari.
-
-To verify a load:
-
-1. `npm run build` (so `dist/safari/` exists)
-2. `npm run package:safari` (so `dist/safari-xcode/` exists)
-3. Open the Xcode project:
-   ```sh
-   open "dist/safari-xcode/Color The Map Importer/Color The Map Importer.xcodeproj"
-   ```
-4. In Xcode, pick the **Color The Map Importer (macOS)** scheme from the run-target dropdown (the converter also generates iOS targets you can ignore for now).
-5. Hit **Run** (**⌘R**). Xcode builds the host app and launches it. A small window appears saying you can enable the extension in Safari.
-6. In Safari:
-   - **Settings → Advanced** → check **Show features for web developers** (one-time).
-   - **Develop** menu → **Allow Unsigned Extensions** (resets every time you quit Safari — that's normal).
-   - **Settings → Extensions** → check the box next to **Color The Map Importer**.
-
-Where to see the alive markers in Safari:
-
-- **Background**: Safari → **Develop → Web Extension Background Content → Color The Map Importer**. Web Inspector opens; Console tab.
-- **Content script**: open any HTTP/HTTPS page, open Web Inspector (**⌥⌘I**), Console tab.
-- **Popup**: click the toolbar icon; right-click inside the popup → **Inspect Element** for its Web Inspector.
-- **Options**: opens as a tab (because `open_in_tab: true`); standard Web Inspector (**⌥⌘I**) applies.
-
-Iterating on the Safari side after a code change:
-
-1. Edit source.
-2. `npm run build` (refreshes `dist/safari/`).
-3. In Xcode, hit **⌘R** again — the host app's build-phase script re-copies resources from `dist/safari/`.
-4. The extension reloads in Safari automatically.
-
-You only need to re-run `npm run package:safari` if you want to regenerate the Xcode project itself (e.g. after changing the manifest schema or bundle identifier). It will overwrite any local Xcode-project tweaks because of `--force`.
-
-Notes on `xcrun safari-web-extension-converter`:
-
-- Requires full Xcode (not just the Command Line Tools). Install Xcode from the App Store first; `xcrun` will otherwise fail with `error: unable to find utility "safari-web-extension-converter"`.
-- The script gates on `process.platform === 'darwin'`, so the same `npm run package` command on Linux CI runners silently skips the Safari step instead of erroring.
-- For App Store distribution you'd later sign the host app with an Apple Developer ID and run a real `xcodebuild archive` — out of scope for the scaffold.
+Deferred — see [issue #5](https://github.com/dhughes/colorthemap-browser-extension/issues/5). Safari needs Xcode, the `safari-web-extension-converter` tool, and (for distribution) Apple Developer enrollment, which together added more complexity than the scaffold milestone warranted. The architecture is Safari-friendly (single manifest source, no Safari-specific assumptions in src/), so adding it back should be additive when #5 is picked up.
 
 ## What's next
 
 Each of these will be a separate issue + branch:
 
-- GPS file format detection (content script + `downloads.onDeterminingFilename`)
+- [#4](https://github.com/dhughes/colorthemap-browser-extension/issues/4) — GPS detection framework (three-detector pipeline, logging only)
+- [#5](https://github.com/dhughes/colorthemap-browser-extension/issues/5) — Add Safari support
 - Color The Map authentication flow
 - Streaming upload to the CTM tusd endpoint
 - Per-domain settings and toast UI
 - Real icons and store listing assets
+- CI/CD: tests + builds on PR/merge, marketplace auto-deploy where feasible

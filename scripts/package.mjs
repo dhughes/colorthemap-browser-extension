@@ -19,7 +19,6 @@ for (const browser of browsers) {
   console.log(`packaged ${browser} -> ${relative(root, outPath)}`);
 }
 
-console.log('safari: dist/safari is ready for `xcrun safari-web-extension-converter dist/safari`');
 
 async function zipDirectory(sourceDir, outPath) {
   await stat(sourceDir);

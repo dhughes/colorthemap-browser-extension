@@ -37,15 +37,18 @@ public/             # static assets copied as-is into each dist (icons go here)
 
 ## Dev
 
-Requires Node 20.19+ or 22.12+ (Vite 7's floor).
+Requires Node 22.12+ (pin: 24.12.0 via `.nvmrc`). Use `nvm use` or let your tooling pick it up automatically.
 
 ```sh
 npm install
+pre-commit install  # one-time: hooks for lint/typecheck/prettier on commit
 npm run build       # build dist/{chrome,edge,firefox}/
 npm test            # vitest
 npm run dev         # rebuild dist/chrome/ on every source change
 npm run package     # build + zip artifacts/{chrome,edge,firefox}.zip
 ```
+
+`pre-commit` is a Python tool. Install it with `brew install pre-commit` or `pip install pre-commit`. Once installed, `pre-commit install` wires up the hooks — lint, typecheck, and Prettier will run automatically on `git commit`.
 
 `npm run dev` builds Chrome into `dist/chrome/` and rebuilds on every edit; load it
 unpacked (see below) and hit reload after a change. To watch a different browser,

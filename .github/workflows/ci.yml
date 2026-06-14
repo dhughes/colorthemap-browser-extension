@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  checks:
+    name: Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: ESLint
+        id: lint
+        continue-on-error: true
+        run: npm run lint
+
+      - name: Prettier check
+        id: format
+        continue-on-error: true
+        run: npm run format:check
+
+      - name: TypeScript type check
+        id: typecheck
+        continue-on-error: true
+        run: npm run typecheck
+
+      - name: Tests
+        id: test
+        continue-on-error: true
+        run: npm test
+
+      - name: Build
+        id: build
+        continue-on-error: true
+        run: npm run build
+
+      - name: Package
+        id: package
+        continue-on-error: true
+        run: npm run package
+
+      - name: Dependency audit
+        id: audit
+        continue-on-error: true
+        run: npm audit --audit-level=high
+
+      - name: Upload extension artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-zips
+          path: |
+            artifacts/chrome.zip
+            artifacts/edge.zip
+            artifacts/firefox.zip
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Check for failures
+        if: steps.lint.outcome == 'failure' || steps.format.outcome == 'failure' || steps.typecheck.outcome == 'failure' || steps.test.outcome == 'failure' || steps.build.outcome == 'failure' || steps.package.outcome == 'failure' || steps.audit.outcome == 'failure'
+        run: |
+          echo "One or more checks failed:"
+          echo "  ESLint: ${{ steps.lint.outcome }}"
+          echo "  Prettier: ${{ steps.format.outcome }}"
+          echo "  TypeScript: ${{ steps.typecheck.outcome }}"
+          echo "  Tests: ${{ steps.test.outcome }}"
+          echo "  Build: ${{ steps.build.outcome }}"
+          echo "  Package: ${{ steps.package.outcome }}"
+          echo "  Audit: ${{ steps.audit.outcome }}"
+          exit 1

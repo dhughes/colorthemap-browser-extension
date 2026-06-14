@@ -1,7 +1,8 @@
 import { mkdir, rm, stat } from 'node:fs/promises';
 import { spawn, spawnSync } from 'node:child_process';
 import { resolve, relative } from 'node:path';
-import { ARTIFACTS_DIR, DIST_DIR, REPO_ROOT, BROWSERS } from './paths.mjs';
+import { ARTIFACTS_DIR, DIST_DIR, REPO_ROOT } from './paths.mjs';
+import { BROWSERS } from './build-manifests.mjs';
 
 // Fail fast if `zip` isn't installed — otherwise the first ENOENT happens
 // mid-loop after `rm` has already deleted the previous artifact, leaving

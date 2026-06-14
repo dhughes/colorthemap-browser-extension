@@ -44,9 +44,14 @@ chmod 700 "$launch_script"
 # moment AppleScript dispatches the "create window" message, but iTerm2 may
 # take noticeably longer (cold start, slow disk) to actually fork the zsh
 # that reads the script. An EXIT trap deletes the file before zsh sees it.
-# The launch script self-deletes on its first line; we only clean up on INT
-# or TERM, which signal that osascript itself failed before dispatch.
-trap 'rm -f "$launch_script"' INT TERM
+# So the cleanup story is:
+#   1. INT/TERM trap covers user interruption between mktemp and osascript.
+#   2. `set -e` failure between mktemp and osascript: explicit ERR trap.
+#   3. osascript non-zero exit (iTerm not installed, AppleScript syntax err):
+#      explicit branch below removes the script.
+#   4. Happy path: launch script self-deletes on its first line as zsh exec's it.
+cleanup_launch_script() { rm -f "$launch_script"; }
+trap cleanup_launch_script INT TERM ERR
 
 WORKTREE_PATH_Q=$(printf '%q' "$WORKTREE_PATH")
 INITIAL_PROMPT_Q=$(printf '%q' "$INITIAL_PROMPT")
@@ -61,8 +66,19 @@ source ~/.zshrc 2>/dev/null || true
 exec $CLAUDE_BIN_Q $INITIAL_PROMPT_Q
 EOS
 
+# Disable -e for osascript so a non-zero exit can run cleanup, not abort
+# without the explicit handler we want to see.
+set +e
 osascript <<EOA
 tell application "iTerm2"
     create window with default profile command "$launch_script"
 end tell
 EOA
+osa_status=$?
+set -e
+
+if [ "$osa_status" -ne 0 ]; then
+    cleanup_launch_script
+    echo "Error: osascript exited with status $osa_status. Is iTerm2 installed?" >&2
+    exit "$osa_status"
+fi

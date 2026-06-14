@@ -16,4 +16,5 @@ export const STAGING_DIR = resolve(REPO_ROOT, 'dist/_build');
 export const DIST_DIR = resolve(REPO_ROOT, 'dist');
 export const ARTIFACTS_DIR = resolve(REPO_ROOT, 'artifacts');
 
-export const BROWSERS = ['chrome', 'edge', 'firefox'];
+// BROWSERS lives in scripts/build-manifests.mjs, derived from the `variants`
+// map there so the two can't drift. If you need it, import from build-manifests.

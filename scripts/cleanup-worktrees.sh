@@ -189,10 +189,28 @@ for i in "${!to_clean[@]}"; do
         # signal was untracked files, there is nothing to commit — skip the
         # snapshot but DO continue to the push so existing committed work on
         # the branch still reaches origin.
+        # `git diff --quiet` exits 0 = clean, 1 = dirty, anything else = git
+        # error (corrupted index, bad gitlink, etc). Distinguish so a real
+        # repo problem doesn't silently get treated as "dirty" and produce a
+        # misleading WIP snapshot commit on top of a broken state.
+        # `|| diff_status=$?` keeps set -e from firing on the non-zero exit
+        # AND captures the real status for the check below.
         tracked_dirty=false
-        if ! git -C "$dir" diff --quiet 2>/dev/null \
-            || ! git -C "$dir" diff --cached --quiet 2>/dev/null; then
+        diff_status=0
+        git -C "$dir" diff --quiet || diff_status=$?
+        if [ "$diff_status" -eq 1 ]; then
             tracked_dirty=true
+        elif [ "$diff_status" -ne 0 ]; then
+            echo "  WARNING: git diff failed (exit $diff_status); skipping this worktree." >&2
+            continue
+        fi
+        cached_status=0
+        git -C "$dir" diff --cached --quiet || cached_status=$?
+        if [ "$cached_status" -eq 1 ]; then
+            tracked_dirty=true
+        elif [ "$cached_status" -ne 0 ]; then
+            echo "  WARNING: git diff --cached failed (exit $cached_status); skipping this worktree." >&2
+            continue
         fi
 
         if [ "$tracked_dirty" = "true" ]; then

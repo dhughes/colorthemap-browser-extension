@@ -7,25 +7,51 @@
 
 import { spawn } from 'node:child_process';
 import { watch } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { REPO_ROOT, STAGING_DIR } from './paths.mjs';
 import { buildManifests } from './build-manifests.mjs';
+
+// fs.watch with `recursive: true` was unsupported on Linux until Node 20.
+// The whole worktree workflow is macOS-gated anyway, but dev.mjs itself runs
+// wherever, so fail loudly with a useful message instead of silently watching
+// nothing.
+const [nodeMajor] = process.versions.node.split('.').map(Number);
+if (nodeMajor < 20) {
+  console.error(`ERROR: Node ${process.versions.node} detected. scripts/dev.mjs requires Node 20+ for fs.watch({recursive: true}).`);
+  process.exit(1);
+}
+
+if (!existsSync(STAGING_DIR)) {
+  console.error(`ERROR: ${STAGING_DIR} does not exist. Run \`npm run build\` first (the \`dev\` npm script handles this for you).`);
+  process.exit(1);
+}
 
 const watchers = [
   {
     label: 'main',
-    args: ['vite', 'build', '--watch', '--mode', 'development'],
+    args: ['build', '--watch', '--mode', 'development'],
   },
   {
     label: 'content',
-    args: ['vite', 'build', '--watch', '--mode', 'development', '--config', 'vite.content.config.ts'],
+    args: ['build', '--watch', '--mode', 'development', '--config', 'vite.content.config.ts'],
   },
 ];
 
 const children = [];
+let shuttingDown = false;
+let firstFailureCode = null;
 
 const shutdown = (signal) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
   for (const child of children) {
-    if (!child.killed) child.kill(signal);
+    if (!child.killed) {
+      try {
+        child.kill(signal);
+      } catch {
+        // ESRCH if the child already died — fine.
+      }
+    }
   }
 };
 
@@ -33,7 +59,10 @@ process.on('SIGINT', () => { shutdown('SIGINT'); });
 process.on('SIGTERM', () => { shutdown('SIGTERM'); });
 
 for (const { label, args } of watchers) {
-  const child = spawn('npx', args, {
+  // Spawn the vite binary directly. `npm run dev` puts node_modules/.bin on
+  // PATH, so vite resolves without needing an npx hop. Saves a node startup
+  // per watcher and keeps signal forwarding (SIGTERM) simple.
+  const child = spawn('vite', args, {
     cwd: REPO_ROOT,
     stdio: ['inherit', 'pipe', 'pipe'],
   });
@@ -45,10 +74,24 @@ for (const { label, args } of watchers) {
   }).join('\n');
   child.stdout.on('data', (chunk) => process.stdout.write(tag(chunk)));
   child.stderr.on('data', (chunk) => process.stderr.write(tag(chunk)));
+  child.on('error', (err) => {
+    console.error(`${prefix}failed to spawn vite:`, err.message);
+    if (firstFailureCode === null) firstFailureCode = 127;
+    process.exitCode = firstFailureCode;
+    shutdown('SIGTERM');
+  });
   child.on('exit', (code) => {
     console.error(`${prefix}exited with code ${code}`);
+    // Preserve the FIRST non-zero exit so a cascading SIGTERM-induced exit
+    // doesn't overwrite the real crash code from whichever watcher actually
+    // failed.
+    if (code !== 0 && firstFailureCode === null) {
+      firstFailureCode = code ?? 1;
+    }
+    if (firstFailureCode !== null) {
+      process.exitCode = firstFailureCode;
+    }
     shutdown('SIGTERM');
-    process.exitCode = code ?? 1;
   });
 }
 
@@ -75,16 +118,24 @@ const runFanOut = async () => {
 };
 
 const scheduleFanOut = () => {
-  // Coalesce bursts (multiple files written in one rebuild) into one fan-out.
+  // Coalesce bursts of writes into one fan-out. 250ms is large enough that a
+  // slow disk's gap between Vite's `popup.js` and `popup.js.map` writes
+  // doesn't trip the timer mid-emit (which would copy a partial staging dir
+  // into the per-browser dists), but small enough that an interactive edit
+  // → reload loop feels instant.
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     debounceTimer = null;
     void runFanOut();
-  }, 100);
+  }, 250);
 };
 
 watch(STAGING_DIR, { recursive: true }, (_eventType, filename) => {
   if (!filename) return;
+  // Ignore sourcemap-only writes — they're filtered out of the per-browser
+  // dists anyway, so re-running fan-out for them would just re-copy the
+  // already-correct output. Real .js / .html / .json changes still trigger.
+  if (filename.endsWith('.map')) return;
   scheduleFanOut();
 });
 

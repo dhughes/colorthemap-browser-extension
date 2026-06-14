@@ -1,7 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-// @ts-expect-error — plain .mjs export; works at runtime, no .d.ts needed
 import { STAGING_DIR, REPO_ROOT } from './scripts/paths.mjs';
 
 const root = fileURLToPath(new URL('.', import.meta.url));

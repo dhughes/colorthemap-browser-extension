@@ -1,7 +1,7 @@
 import { readFile, writeFile, cp, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import { REPO_ROOT, STAGING_DIR, DIST_DIR } from './paths.mjs';
 
 const variants = {
@@ -23,6 +23,11 @@ const variants = {
     }),
   },
 };
+
+// Single source of truth for which browsers we support. Other scripts
+// (package.mjs's zip loop, etc.) import this rather than maintaining their
+// own list so adding Safari (#5) is a one-place change.
+export const BROWSERS = Object.keys(variants);
 
 // Filter out *.map sourcemaps and `.gitkeep` placeholders so each per-browser
 // dist (and the eventual store-listing zip) doesn't ship them. Sourcemaps
@@ -55,6 +60,9 @@ export async function buildManifests() {
 }
 
 // Run when invoked as a script (npm run build), not when imported.
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+// `pathToFileURL(argv[1]).href` normalizes through symlinks so this guard is
+// stable under npm exec / pnpm / node_modules/.bin symlinks where argv[1]
+// would otherwise diverge from the canonical import.meta.url.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   await buildManifests();
 }

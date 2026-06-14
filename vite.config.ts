@@ -1,27 +1,30 @@
-import { defineConfig } from 'vite';
-import webExtension, { readJsonFile } from 'vite-plugin-web-extension';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { defineConfig } from "vite";
+import webExtension, { readJsonFile } from "vite-plugin-web-extension";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = fileURLToPath(new URL('.', import.meta.url));
+const root = fileURLToPath(new URL(".", import.meta.url));
 
 // `vite build --watch` re-runs the plugin's buildStart on every rebuild, which
 // empties the outDir when emptyOutDir is set — leaving a window where the loaded
 // extension on disk is incomplete. One-shot builds clean up front via
 // `npm run clean`, so only empty the outDir when we're not watching.
-const isWatch = process.argv.includes('--watch');
+const isWatch = process.argv.includes("--watch");
 
 // The browser targets. Adding one (e.g. Safari #5) means: an entry here, its
 // manifest shape in generateManifest() below, and matching build:/package:
 // scripts in package.json (the npm scripts drive one target per invocation).
-const TARGETS = ['chrome', 'edge', 'firefox'] as const;
+const TARGETS = ["chrome", "edge", "firefox"] as const;
 type Target = (typeof TARGETS)[number];
 
-const isTarget = (value: string): value is Target => TARGETS.includes(value as Target);
+const isTarget = (value: string): value is Target =>
+  TARGETS.includes(value as Target);
 
-const target = process.env.TARGET_BROWSER ?? 'chrome';
+const target = process.env.TARGET_BROWSER ?? "chrome";
 if (!isTarget(target)) {
-  throw new Error(`Unknown TARGET_BROWSER "${target}". Expected one of: ${TARGETS.join(', ')}`);
+  throw new Error(
+    `Unknown TARGET_BROWSER "${target}". Expected one of: ${TARGETS.join(", ")}`,
+  );
 }
 
 // Per-browser manifest variants. The plugin resolves the manifest template
@@ -33,18 +36,18 @@ if (!isTarget(target)) {
 // — and needs a `browser_specific_settings.gecko` block. Chrome and Edge share
 // the base shape.
 function generateManifest() {
-  const base = readJsonFile(resolve(root, 'manifest.base.json'));
-  if (target === 'firefox') {
+  const base = readJsonFile(resolve(root, "manifest.base.json"));
+  if (target === "firefox") {
     return {
       ...base,
       background: {
-        scripts: ['background.ts'],
-        type: 'module',
+        scripts: ["background.ts"],
+        type: "module",
       },
       browser_specific_settings: {
         gecko: {
-          id: 'ctm-importer@colorthemap.app',
-          strict_min_version: '121.0',
+          id: "ctm-importer@colorthemap.app",
+          strict_min_version: "121.0",
         },
       },
     };
@@ -55,19 +58,19 @@ function generateManifest() {
 export default defineConfig({
   // Root at src/ so built entry files land at the top of dist/<browser>/
   // (background.js, popup.html, …) rather than nested under src/.
-  root: resolve(root, 'src'),
-  publicDir: resolve(root, 'public'),
+  root: resolve(root, "src"),
+  publicDir: resolve(root, "public"),
   build: {
     outDir: resolve(root, `dist/${target}`),
     emptyOutDir: !isWatch,
     sourcemap: true,
-    target: 'es2022',
+    target: "es2022",
   },
   plugins: [
     webExtension({
       manifest: generateManifest,
       // web-ext only knows 'firefox' vs Chromium; Edge validates as Chromium.
-      browser: target === 'firefox' ? 'firefox' : 'chrome',
+      browser: target === "firefox" ? "firefox" : "chrome",
       // We load the unpacked extension manually (see README), so don't let
       // web-ext spawn a browser in watch/dev mode.
       disableAutoLaunch: true,
@@ -77,7 +80,7 @@ export default defineConfig({
       // build` validates at package time instead.
       skipManifestValidation: true,
       // Rebuild when the manifest source changes, not just src/ entries.
-      watchFilePaths: [resolve(root, 'manifest.base.json')],
+      watchFilePaths: [resolve(root, "manifest.base.json")],
     }),
   ],
 });

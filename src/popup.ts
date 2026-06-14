@@ -1,3 +1,3 @@
-import { aliveMessage } from './shared/alive';
+import { aliveMessage } from "./shared/alive";
 
-console.log(aliveMessage('popup'));
+console.log(aliveMessage("popup"));

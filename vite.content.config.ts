@@ -9,7 +9,10 @@ const root = fileURLToPath(new URL('.', import.meta.url));
 // get inlined into one file.
 export default defineConfig({
   build: {
-    outDir: resolve(root, 'dist/chrome'),
+    // Writes into the same neutral staging dir as vite.config.ts so the
+    // content script gets layered on top of the main build's output.
+    // Keep in sync with vite.config.ts's stagingDir.
+    outDir: resolve(root, 'dist/_build'),
     emptyOutDir: false,
     sourcemap: true,
     target: 'es2022',

@@ -17,7 +17,15 @@ When the user indicates they're done with a worktree and want to preserve their 
 
 ### 1. Merge settings.local.json
 
-Read the current worktree's `.claude/settings.local.json` and the main repo's copy at `/Users/doughughes/Projects/Personal/colorthemap-browser-extension/.claude/settings.local.json`.
+Read the current worktree's `.claude/settings.local.json`.
+
+Find the main repo's path with:
+
+```bash
+git worktree list --porcelain | awk '/^worktree / { print $2; exit }'
+```
+
+That's always the first entry. Read the main repo's `.claude/settings.local.json` from `<main-repo>/.claude/settings.local.json`.
 
 Merge the `permissions.allow` arrays:
 - Take the union of both arrays (no duplicates)

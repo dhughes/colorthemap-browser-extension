@@ -32,7 +32,17 @@ if $dry_run; then
 fi
 
 echo "Fetching closed GitHub issues..."
-closed_issues_list=$(gh issue list --state closed --limit 10000 --json number --jq '.[].number' 2>/dev/null || echo "")
+# Capture stderr so an auth/network failure produces an actionable error
+# instead of silently turning every branch into "KEEPING (NO PR)" later.
+gh_err=$(mktemp)
+if ! closed_issues_list=$(gh issue list --state closed --limit 10000 --json number --jq '.[].number' 2>"$gh_err"); then
+    echo "ERROR: gh issue list failed:" >&2
+    cat "$gh_err" >&2
+    rm -f "$gh_err"
+    echo "Cleanup needs GitHub connectivity to safely determine which branches are done." >&2
+    exit 2
+fi
+rm -f "$gh_err"
 echo ""
 
 is_issue_closed() {
@@ -84,7 +94,12 @@ for dir in "$WORKTREE_BASE"/*/; do
 
     pr_state=""
     if [ -n "$branch" ]; then
-        pr_state=$(gh pr list --head "$branch" --state all --json state --jq '.[0].state // empty' 2>/dev/null || true)
+        # Sort by createdAt desc so .[0] is the newest PR for this branch.
+        # gh pr list's default order isn't documented as newest-first, so
+        # without this an old CLOSED PR could shadow a newer OPEN one and
+        # the script would force-push WIP onto an active branch.
+        pr_state=$(gh pr list --head "$branch" --state all --json state,createdAt \
+            --jq 'sort_by(.createdAt) | reverse | .[0].state // empty' 2>/dev/null || true)
     fi
 
     cleanup_reason=""
@@ -165,14 +180,28 @@ for i in "${!to_clean[@]}"; do
 
     if [ "$save_to_remote" = "true" ] && [ -n "$branch" ] && [ -d "$dir" ]; then
         if is_worktree_dirty "$dir"; then
-            echo "  Committing uncommitted work..."
-            if ! git -C "$dir" add -A; then
+            # Stage tracked files only — `git add -u` skips anything that's
+            # never been tracked. This is the safety boundary: an untracked
+            # .env / secret in the worktree must NOT get force-pushed during
+            # cleanup, ever. If the user has real untracked WIP they want to
+            # save, the right move is to add+commit it themselves first.
+            untracked=$(git -C "$dir" ls-files --others --exclude-standard 2>/dev/null || true)
+            if [ -n "$untracked" ]; then
+                echo "  WARNING: untracked files present; leaving them in place. Files:"
+                echo "$untracked" | sed 's/^/    /' >&2
+            fi
+            echo "  Committing modifications to tracked files..."
+            if ! git -C "$dir" add -u; then
                 echo "  WARNING: git add failed; skipping push and cleanup for this worktree."
                 echo ""
                 continue
             fi
-            if ! git -C "$dir" commit -m "WIP: pre-cleanup snapshot" --no-verify; then
-                echo "  WARNING: commit failed; skipping push and cleanup for this worktree."
+            # Pre-commit hooks (lint, secret-scan, etc.) should be allowed to
+            # run — they're the defense-in-depth that would catch a secret
+            # accidentally staged via a tracked-file edit. If the hook fails,
+            # we fail loudly rather than silently bypassing it.
+            if ! git -C "$dir" commit -m "WIP: pre-cleanup snapshot"; then
+                echo "  WARNING: commit failed (likely a pre-commit hook); skipping push and cleanup for this worktree."
                 echo ""
                 continue
             fi

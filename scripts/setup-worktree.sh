@@ -9,11 +9,20 @@ if [ "$(uname)" != "Darwin" ]; then
     exit 1
 fi
 
-MAIN_REPO="/Users/doughughes/Projects/Personal/colorthemap-browser-extension"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKTREE_ROOT="$(dirname "$SCRIPT_DIR")"
 
 cd "$WORKTREE_ROOT"
+
+# Derive the main worktree's path from git — `git worktree list --porcelain`
+# always lists the main worktree first. This works from a worktree (where we
+# need it to find the main repo) and on a fresh checkout (where it's a no-op
+# because MAIN_REPO == WORKTREE_ROOT).
+MAIN_REPO=$(git worktree list --porcelain 2>/dev/null | awk '/^worktree / { print $2; exit }')
+if [ -z "$MAIN_REPO" ]; then
+    echo "ERROR: could not determine main repo path via git worktree list."
+    exit 1
+fi
 
 echo "Setting up: $WORKTREE_ROOT"
 

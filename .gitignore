@@ -1,0 +1,11 @@
+node_modules/
+dist/
+artifacts/
+.vite/
+*.log
+.DS_Store
+.env
+.env.local
+coverage/
+.claude/settings.local.json
+.claude/scheduled_tasks.lock

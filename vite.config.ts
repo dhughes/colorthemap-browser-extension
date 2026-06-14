@@ -1,46 +1,83 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from 'vite';
+import webExtension, { readJsonFile } from 'vite-plugin-web-extension';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { STAGING_DIR, REPO_ROOT } from './scripts/paths.mjs';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 
-// Vite writes to the neutral staging dir. The dev orchestrator
-// (`scripts/dev.mjs`) watches the staging dir and re-runs build-manifests
-// to fan out to dist/{chrome,edge,firefox}/. In one-shot `npm run build`,
-// the same fan-out runs as the next npm script. Vite itself doesn't know
-// about per-browser variants — keeps the config simple and avoids the
-// cross-process race of two `vite build --watch` runs both fan-out'ing
-// the same dirs simultaneously.
+// `vite build --watch` re-runs the plugin's buildStart on every rebuild, which
+// empties the outDir when emptyOutDir is set — leaving a window where the loaded
+// extension on disk is incomplete. One-shot builds clean up front via
+// `npm run clean`, so only empty the outDir when we're not watching.
+const isWatch = process.argv.includes('--watch');
 
-export default defineConfig(({ mode }) => ({
+// The browser targets. Adding one (e.g. Safari #5) means: an entry here, its
+// manifest shape in generateManifest() below, and matching build:/package:
+// scripts in package.json (the npm scripts drive one target per invocation).
+const TARGETS = ['chrome', 'edge', 'firefox'] as const;
+type Target = (typeof TARGETS)[number];
+
+const isTarget = (value: string): value is Target => TARGETS.includes(value as Target);
+
+const target = process.env.TARGET_BROWSER ?? 'chrome';
+if (!isTarget(target)) {
+  throw new Error(`Unknown TARGET_BROWSER "${target}". Expected one of: ${TARGETS.join(', ')}`);
+}
+
+// Per-browser manifest variants. The plugin resolves the manifest template
+// before it extracts build inputs, so entry paths here point at source files
+// (relative to the `src` root below) and the plugin rewrites them to built
+// filenames.
+//
+// Firefox MV3 rejects `background.service_worker` — it wants `background.scripts`
+// — and needs a `browser_specific_settings.gecko` block. Chrome and Edge share
+// the base shape.
+function generateManifest() {
+  const base = readJsonFile(resolve(root, 'manifest.base.json'));
+  if (target === 'firefox') {
+    return {
+      ...base,
+      background: {
+        scripts: ['background.ts'],
+        type: 'module',
+      },
+      browser_specific_settings: {
+        gecko: {
+          id: 'ctm-importer@colorthemap.app',
+          strict_min_version: '121.0',
+        },
+      },
+    };
+  }
+  return base;
+}
+
+export default defineConfig({
+  // Root at src/ so built entry files land at the top of dist/<browser>/
+  // (background.js, popup.html, …) rather than nested under src/.
   root: resolve(root, 'src'),
   publicDir: resolve(root, 'public'),
   build: {
-    outDir: STAGING_DIR,
-    // Wiping the staging dir on each build is correct for one-shot builds.
-    // In dev/watch mode it would destroy the content.js that
-    // vite.content.config.ts wrote on the previous pass — so skip the wipe.
-    // `npm run build` runs `npm run clean` first to handle stale state.
-    emptyOutDir: mode !== 'development',
+    outDir: resolve(root, `dist/${target}`),
+    emptyOutDir: !isWatch,
     sourcemap: true,
     target: 'es2022',
-    rollupOptions: {
-      input: {
-        background: resolve(root, 'src/background.ts'),
-        popup: resolve(root, 'src/popup.html'),
-        options: resolve(root, 'src/options.html'),
-      },
-      output: {
-        entryFileNames: '[name].js',
-        chunkFileNames: 'chunks/[name]-[hash].js',
-        assetFileNames: '[name][extname]',
-      },
-    },
   },
-  test: {
-    environment: 'node',
-    root: REPO_ROOT,
-    include: ['src/**/*.test.ts'],
-  },
-}));
+  plugins: [
+    webExtension({
+      manifest: generateManifest,
+      // web-ext only knows 'firefox' vs Chromium; Edge validates as Chromium.
+      browser: target === 'firefox' ? 'firefox' : 'chrome',
+      // We load the unpacked extension manually (see README), so don't let
+      // web-ext spawn a browser in watch/dev mode.
+      disableAutoLaunch: true,
+      // Default validation fetches a JSON schema over the network with no
+      // timeout (and validates every target against the Chrome schema), which
+      // makes builds hang/fail non-deterministically off-network. `web-ext
+      // build` validates at package time instead.
+      skipManifestValidation: true,
+      // Rebuild when the manifest source changes, not just src/ entries.
+      watchFilePaths: [resolve(root, 'manifest.base.json')],
+    }),
+  ],
+});

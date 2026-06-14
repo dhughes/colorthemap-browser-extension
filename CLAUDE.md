@@ -27,8 +27,8 @@ Target browsers at launch: Chrome, Edge, Firefox. Safari is deferred to #5.
 
 ## Architecture (don't re-derive)
 
-- **`manifest.base.json` is the single source of truth.** `scripts/build-manifests.mjs` fans it out into `dist/{chrome,edge,firefox}/`. Firefox gets `background.scripts` instead of `service_worker` (Firefox MV3 doesn't accept the latter) plus `browser_specific_settings.gecko`. Per-browser variants belong in the build script, never as duplicated manifest files.
-- **MV3 content scripts cannot use ES module imports.** `vite.content.config.ts` builds the content script as an IIFE for that reason. The main `vite.config.ts` builds the background SW (module), popup, and options page as ESM. Two separate Vite configs, run sequentially during `npm run build`.
+- **`manifest.base.json` is the single source of truth.** The build runs through [`vite-plugin-web-extension`](https://github.com/aklinker1/vite-plugin-web-extension): `vite.config.ts` reads the base manifest and `generateManifest()` applies per-browser variants, building each target into `dist/{chrome,edge,firefox}/`. Firefox gets `background.scripts` instead of `service_worker` (Firefox MV3 doesn't accept the latter) plus `browser_specific_settings.gecko`. Per-browser variants belong in `generateManifest()`, never as duplicated manifest files. The target is selected by `TARGET_BROWSER`; `npm run build` loops all three.
+- **MV3 content scripts cannot use ES module imports.** The plugin bundles every script entry — both the content script and the background SW — as a standalone IIFE with shared `src/` modules inlined (so the SW's `type: module` is effectively cosmetic; don't rely on real module-SW semantics like dynamic `import()` of a sibling chunk). Only the HTML pages (popup, options) carry module scripts. One `vite.config.ts` — no second config, no manifest fan-out script. `vitest.config.ts` is kept separate so the build plugin doesn't run during unit tests.
 - **`webextension-polyfill`** is the cross-browser primitive — same source builds for Chrome / Edge / Firefox.
 - **Auth flow** (when #10 lands) is OAuth Authorization Code + PKCE via `chrome.identity.launchWebAuthFlow`, talking to CTM's `/oauth/authorize` and `/oauth/token`. All token state and refresh logic live in the background SW with a single-flight refresh guard. See #10 for full design.
 - **Three-detector pipeline** for download detection: DOM scan + badge (all browsers), main-world fetch/XHR wrap (all browsers), `chrome.downloads.onDeterminingFilename` (Chrome / Edge / Firefox only). See #4.
@@ -47,10 +47,10 @@ No `&&`, `||`, `;`, or `|` chaining. No multi-line commands. **Exception:** here
 
 ```bash
 npm install            # one-time, or after dep changes
-npm run build          # vite build + per-browser manifests under dist/
+npm run build          # build dist/{chrome,edge,firefox}/
 npm test               # vitest
 npm run typecheck      # tsc --noEmit
-npm run dev            # vite build --watch
+npm run dev            # rebuild dist/chrome/ on every source change
 npm run package        # build + zip artifacts/{chrome,edge,firefox}.zip
 ```
 

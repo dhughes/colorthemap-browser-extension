@@ -48,6 +48,14 @@ npm run dev         # vite build --watch
 npm run package     # build + zip artifacts/{chrome,edge,firefox}.zip
 ```
 
+**Note on `npm run package`:** there's a known intermittent failure on macOS + Node 24 where `zip` exits 12 ("Nothing to do!") when launched through the `npm run` chain. If you hit this, run the same chain directly:
+
+```sh
+npm run build && node scripts/package.mjs
+```
+
+This gets resolved when the hand-rolled build pipeline migrates to a proper WebExtension Vite plugin — see [#11](https://github.com/dhughes/colorthemap-browser-extension/issues/11).
+
 ### Load the unpacked extension
 
 Build first so `dist/` exists:

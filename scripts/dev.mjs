@@ -55,6 +55,15 @@ const shutdown = (signal) => {
       }
     }
   }
+  // Cancel any pending debounced fan-out. Without this, a timer armed
+  // milliseconds before SIGINT could still fire after we closed the watcher
+  // and trigger a wasted buildManifests() against a staging dir nobody is
+  // updating anymore. Any in-flight `running` promise is left to settle —
+  // its completion is desirable (we don't want torn writes).
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  }
   // Close the FSWatcher too. Without this, the active fs.watch keeps the
   // event loop alive after the children exit and the process hangs forever,
   // ignoring process.exitCode entirely. Setting null lets a late event

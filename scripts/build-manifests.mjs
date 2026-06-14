@@ -7,10 +7,14 @@ import { REPO_ROOT, STAGING_DIR, DIST_DIR } from './paths.mjs';
 // Single source of truth for browser variants. Adding Safari (#5) is one
 // entry here; the per-browser keys flow out to package.mjs's zip loop and
 // anywhere else that needs to iterate the list, so they can't drift.
-export const variants = {
-  chrome: { transform: (m) => m },
-  edge: { transform: (m) => m },
-  firefox: {
+//
+// Frozen so a consumer can't accidentally mutate the shared map — both the
+// top-level object and each entry, since each entry holds the transform fn
+// callers actually invoke.
+export const variants = Object.freeze({
+  chrome: Object.freeze({ transform: (m) => m }),
+  edge: Object.freeze({ transform: (m) => m }),
+  firefox: Object.freeze({
     transform: (m) => ({
       ...m,
       background: {
@@ -24,8 +28,8 @@ export const variants = {
         },
       },
     }),
-  },
-};
+  }),
+});
 
 // Filter out *.map sourcemaps and `.gitkeep` placeholders so each per-browser
 // dist (and the eventual store-listing zip) doesn't ship them. Sourcemaps

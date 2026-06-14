@@ -194,14 +194,16 @@ for i in "${!to_clean[@]}"; do
         # signal was untracked files, there is nothing to commit — skip the
         # snapshot but DO continue to the push so existing committed work on
         # the branch still reaches origin.
-        # `git diff-index --quiet HEAD --` reports whether the working tree
-        # (tracked files only) differs from HEAD in one call covering both
-        # staged AND unstaged changes. Exit 0 = clean, 1 = dirty, anything
-        # else = git error. On a real git error, fall through to the snapshot
-        # attempt: `git add -u` will surface the same error with a clearer
-        # message there, and we still push any prior committed work even if
-        # the snapshot fails.
-        if git -C "$dir" diff-index --quiet HEAD --; then
+        # `git diff --quiet HEAD` reports whether the working tree (tracked
+        # files only) differs from HEAD — staged AND unstaged — in one call.
+        # Use porcelain `git diff` rather than plumbing `git diff-index`
+        # because plumbing doesn't refresh the stat cache, so a touched-but-
+        # unchanged file (post-checkout, post-rsync, editor save-without-
+        # edit) gets reported as dirty. That would push us into the snapshot
+        # branch, `git add -u` would stage nothing, `commit` would fail with
+        # "nothing to commit", and we'd skip the push entirely — losing the
+        # actually-committed work we were supposed to save.
+        if git -C "$dir" diff --quiet HEAD; then
             tracked_dirty=false
         else
             tracked_dirty=true

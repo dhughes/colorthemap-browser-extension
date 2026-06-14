@@ -1,54 +1,28 @@
 import { defineConfig } from 'vitest/config';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
+// @ts-expect-error — plain .mjs export; works at runtime, no .d.ts needed
+import { STAGING_DIR, REPO_ROOT } from './scripts/paths.mjs';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 
-// Neutral staging output that downstream variants (chrome / edge / firefox /
-// future safari) copy from. Keep this in sync with scripts/build-manifests.mjs
-// and vite.content.config.ts — there is one shared constant by convention but
-// not by import, because vite reads its config in a separate JS evaluation
-// where importing build-time helpers adds churn we don't need yet.
-const stagingDir = resolve(root, 'dist/_build');
-
-// In dev/watch mode, re-fan-out the per-browser dist dirs after every Vite
-// rebuild. Without this, editing popup.ts updates dist/_build/popup.js but
-// dist/chrome/popup.js stays stale, and the user's loaded-unpacked extension
-// keeps running the old code.
-//
-// In production builds we DON'T attach this plugin — the npm `build` script
-// invokes build-manifests.mjs as an explicit later step, so running it twice
-// would just duplicate work.
-const fanOutManifests = () => ({
-  name: 'ctm-fan-out-manifests',
-  apply: 'build' as const,
-  async closeBundle() {
-    await new Promise<void>((resolvePromise, rejectPromise) => {
-      const child = spawn('node', [resolve(root, 'scripts/build-manifests.mjs')], {
-        stdio: 'inherit',
-        cwd: root,
-      });
-      child.on('error', rejectPromise);
-      child.on('exit', (code) => {
-        if (code === 0) resolvePromise();
-        else rejectPromise(new Error(`build-manifests exited with code ${code}`));
-      });
-    });
-  },
-});
+// Vite writes to the neutral staging dir. The dev orchestrator
+// (`scripts/dev.mjs`) watches the staging dir and re-runs build-manifests
+// to fan out to dist/{chrome,edge,firefox}/. In one-shot `npm run build`,
+// the same fan-out runs as the next npm script. Vite itself doesn't know
+// about per-browser variants — keeps the config simple and avoids the
+// cross-process race of two `vite build --watch` runs both fan-out'ing
+// the same dirs simultaneously.
 
 export default defineConfig(({ mode }) => ({
   root: resolve(root, 'src'),
   publicDir: resolve(root, 'public'),
-  plugins: mode === 'development' ? [fanOutManifests()] : [],
   build: {
-    outDir: stagingDir,
+    outDir: STAGING_DIR,
     // Wiping the staging dir on each build is correct for one-shot builds.
-    // In dev/watch mode it would destroy the content.js + manifest.json that
-    // vite.content.config.ts and build-manifests.mjs wrote on the previous
-    // pass, leaving the unpacked extension unloadable until a full rebuild —
-    // so we skip the wipe in dev. `npm run dev` cleans dist/ explicitly first.
+    // In dev/watch mode it would destroy the content.js that
+    // vite.content.config.ts wrote on the previous pass — so skip the wipe.
+    // `npm run build` runs `npm run clean` first to handle stale state.
     emptyOutDir: mode !== 'development',
     sourcemap: true,
     target: 'es2022',
@@ -67,7 +41,7 @@ export default defineConfig(({ mode }) => ({
   },
   test: {
     environment: 'node',
-    root: root,
+    root: REPO_ROOT,
     include: ['src/**/*.test.ts'],
   },
 }));

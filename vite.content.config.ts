@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { STAGING_DIR } from './scripts/paths.mjs';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 
@@ -11,8 +12,7 @@ export default defineConfig({
   build: {
     // Writes into the same neutral staging dir as vite.config.ts so the
     // content script gets layered on top of the main build's output.
-    // Keep in sync with vite.config.ts's stagingDir.
-    outDir: resolve(root, 'dist/_build'),
+    outDir: STAGING_DIR,
     emptyOutDir: false,
     sourcemap: true,
     target: 'es2022',

@@ -1,19 +1,8 @@
 import { readFile, writeFile, cp, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-const here = dirname(fileURLToPath(import.meta.url));
-const root = resolve(here, '..');
-
-// Single neutral staging dir that both Vite passes write into. No browser
-// is privileged as "the canonical base" — each per-browser dist is built
-// by copying from _build and applying that browser's manifest transform
-// (and, in the future, its packaging step). This is the slot Safari (#5)
-// can plug into without parallel infrastructure.
-const stagingDir = resolve(root, 'dist/_build');
-
-const base = JSON.parse(await readFile(resolve(root, 'manifest.base.json'), 'utf8'));
+import { REPO_ROOT, STAGING_DIR, DIST_DIR } from './paths.mjs';
 
 const variants = {
   chrome: { transform: (m) => m },
@@ -35,26 +24,37 @@ const variants = {
   },
 };
 
-if (!existsSync(stagingDir)) {
-  throw new Error(`Expected vite build output at ${stagingDir}. Run \`vite build\` first.`);
-}
-
-// Filter out *.map sourcemaps and the public/ .gitkeep placeholder so each
-// per-browser dist (and the eventual store-listing zip) doesn't ship them.
-// Sourcemaps stay in dist/_build for local debugging.
+// Filter out *.map sourcemaps and `.gitkeep` placeholders so each per-browser
+// dist (and the eventual store-listing zip) doesn't ship them. Sourcemaps
+// stay in dist/_build for local debugging. Checks the tail path component
+// (rather than `.endsWith('/.gitkeep')`) so it works on Windows too.
 const stripUnwanted = (src) => {
   if (src.endsWith('.map')) return false;
-  if (src.endsWith('/.gitkeep')) return false;
+  const tail = src.split(sep).pop();
+  if (tail === '.gitkeep') return false;
   return true;
 };
 
-await Promise.all(
-  Object.entries(variants).map(async ([name, { transform }]) => {
-    const dir = resolve(root, 'dist', name);
-    await rm(dir, { recursive: true, force: true });
-    await cp(stagingDir, dir, { recursive: true, filter: stripUnwanted });
-    const manifest = transform(structuredClone(base));
-    await writeFile(resolve(dir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
-    console.log(`wrote ${name} manifest`);
-  }),
-);
+export async function buildManifests() {
+  if (!existsSync(STAGING_DIR)) {
+    throw new Error(`Expected vite build output at ${STAGING_DIR}. Run \`vite build\` first.`);
+  }
+
+  const base = JSON.parse(await readFile(resolve(REPO_ROOT, 'manifest.base.json'), 'utf8'));
+
+  await Promise.all(
+    Object.entries(variants).map(async ([name, { transform }]) => {
+      const dir = resolve(DIST_DIR, name);
+      await rm(dir, { recursive: true, force: true });
+      await cp(STAGING_DIR, dir, { recursive: true, filter: stripUnwanted });
+      const manifest = transform(structuredClone(base));
+      await writeFile(resolve(dir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+      console.log(`wrote ${name} manifest`);
+    }),
+  );
+}
+
+// Run when invoked as a script (npm run build), not when imported.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  await buildManifests();
+}

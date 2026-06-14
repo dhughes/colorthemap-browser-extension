@@ -7,3 +7,5 @@ artifacts/
 .env
 .env.local
 coverage/
+.claude/settings.local.json
+.claude/scheduled_tasks.lock

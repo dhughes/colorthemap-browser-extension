@@ -32,17 +32,13 @@ if $dry_run; then
 fi
 
 echo "Fetching closed GitHub issues..."
-# Capture stderr so an auth/network failure produces an actionable error
-# instead of silently turning every branch into "KEEPING (NO PR)" later.
-gh_err=$(mktemp)
-if ! closed_issues_list=$(gh issue list --state closed --limit 10000 --json number --jq '.[].number' 2>"$gh_err"); then
-    echo "ERROR: gh issue list failed:" >&2
-    cat "$gh_err" >&2
-    rm -f "$gh_err"
-    echo "Cleanup needs GitHub connectivity to safely determine which branches are done." >&2
+# Let gh's stderr go straight to the user's terminal. An auth/network failure
+# previously turned every branch into "KEEPING (NO PR)" silently; now the
+# script aborts loudly. Capture stdout only so the assignment fails on error.
+if ! closed_issues_list=$(gh issue list --state closed --limit 10000 --json number --jq '.[].number'); then
+    echo "ERROR: gh issue list failed. Cleanup needs GitHub connectivity to safely determine which branches are done." >&2
     exit 2
 fi
-rm -f "$gh_err"
 echo ""
 
 is_issue_closed() {
@@ -94,12 +90,13 @@ for dir in "$WORKTREE_BASE"/*/; do
 
     pr_state=""
     if [ -n "$branch" ]; then
-        # Sort by createdAt desc so .[0] is the newest PR for this branch.
-        # gh pr list's default order isn't documented as newest-first, so
-        # without this an old CLOSED PR could shadow a newer OPEN one and
-        # the script would force-push WIP onto an active branch.
-        pr_state=$(gh pr list --head "$branch" --state all --json state,createdAt \
-            --jq 'sort_by(.createdAt) | reverse | .[0].state // empty' 2>/dev/null || true)
+        # Sort by updatedAt desc so .[0] is the most-recently-touched PR.
+        # `createdAt` would mis-order reopens (a stale PR reopened after a
+        # newer abandoned one would still sort behind it). Bump --limit well
+        # past gh's 30 default so the sort sees every PR for this head — a
+        # client-side sort can't reorder records the server already truncated.
+        pr_state=$(gh pr list --head "$branch" --state all --limit 200 --json state,updatedAt \
+            --jq 'sort_by(.updatedAt) | reverse | .[0].state // empty' 2>/dev/null || true)
     fi
 
     cleanup_reason=""
@@ -179,17 +176,26 @@ for i in "${!to_clean[@]}"; do
     echo "--- Cleaning up: $dir_name ---"
 
     if [ "$save_to_remote" = "true" ] && [ -n "$branch" ] && [ -d "$dir" ]; then
-        if is_worktree_dirty "$dir"; then
-            # Stage tracked files only — `git add -u` skips anything that's
-            # never been tracked. This is the safety boundary: an untracked
-            # .env / secret in the worktree must NOT get force-pushed during
-            # cleanup, ever. If the user has real untracked WIP they want to
-            # save, the right move is to add+commit it themselves first.
-            untracked=$(git -C "$dir" ls-files --others --exclude-standard 2>/dev/null || true)
-            if [ -n "$untracked" ]; then
-                echo "  WARNING: untracked files present; leaving them in place. Files:"
-                echo "$untracked" | sed 's/^/    /' >&2
-            fi
+        # Surface any untracked files but leave them in place — staging them
+        # would risk force-pushing a stray .env / secret to origin during
+        # cleanup. The user has to deal with untracked files themselves.
+        untracked=$(git -C "$dir" ls-files --others --exclude-standard 2>/dev/null || true)
+        if [ -n "$untracked" ]; then
+            echo "  NOTE: untracked files present; leaving them in place." >&2
+            echo "$untracked" | sed 's/^/    /' >&2
+        fi
+
+        # Snapshot tracked-file modifications, if any. If the only "dirty"
+        # signal was untracked files, there is nothing to commit — skip the
+        # snapshot but DO continue to the push so existing committed work on
+        # the branch still reaches origin.
+        tracked_dirty=false
+        if ! git -C "$dir" diff --quiet 2>/dev/null \
+            || ! git -C "$dir" diff --cached --quiet 2>/dev/null; then
+            tracked_dirty=true
+        fi
+
+        if [ "$tracked_dirty" = "true" ]; then
             echo "  Committing modifications to tracked files..."
             if ! git -C "$dir" add -u; then
                 echo "  WARNING: git add failed; skipping push and cleanup for this worktree."

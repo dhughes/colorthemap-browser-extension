@@ -33,12 +33,20 @@ CLAUDE_BIN="${CLAUDE_BIN:-$HOME/.local/bin/claude}"
 # Avoids 4+ levels of nested shell/AppleScript quoting and the injection that
 # comes with it. printf %q shell-quotes each interpolated value so it's
 # tokenized safely by zsh.
-launch_script=$(mktemp -t open-worktree-claude.XXXXXX.sh)
+#
+# macOS mktemp -t treats its argument as a literal prefix (XXXXXX is NOT
+# expanded inside the template), so just give it a short prefix and let
+# mktemp append its own random suffix.
+launch_script=$(mktemp -t ctm-open-worktree)
 chmod 700 "$launch_script"
 
-# Cleanup: the launch script removes itself once exec'd. The EXIT trap handles
-# the case where osascript fails before the script runs.
-trap 'rm -f "$launch_script"' EXIT INT TERM
+# We CANNOT trap EXIT to delete the launch script: osascript returns the
+# moment AppleScript dispatches the "create window" message, but iTerm2 may
+# take noticeably longer (cold start, slow disk) to actually fork the zsh
+# that reads the script. An EXIT trap deletes the file before zsh sees it.
+# The launch script self-deletes on its first line; we only clean up on INT
+# or TERM, which signal that osascript itself failed before dispatch.
+trap 'rm -f "$launch_script"' INT TERM
 
 WORKTREE_PATH_Q=$(printf '%q' "$WORKTREE_PATH")
 INITIAL_PROMPT_Q=$(printf '%q' "$INITIAL_PROMPT")

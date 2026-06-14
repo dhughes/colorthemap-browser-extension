@@ -10,10 +10,10 @@ This branch is the **project scaffold only** — Manifest V3 shell, build pipeli
 
 ## Stack
 
-- TypeScript + Vite (multi-entry build)
+- TypeScript + Vite, built with [`vite-plugin-web-extension`](https://github.com/aklinker1/vite-plugin-web-extension)
 - Vitest for unit tests
 - `webextension-polyfill` so the same source builds against Chrome, Edge, and Firefox
-- Single `manifest.base.json`; `scripts/build-manifests.mjs` fans it out into per-browser `dist/` folders
+- Single `manifest.base.json`; `vite.config.ts` builds it per-browser into `dist/{chrome,edge,firefox}/`
 - Safari is deferred to a follow-up issue (see [#5](https://github.com/dhughes/colorthemap-browser-extension/issues/5)) because its toolchain (Xcode + converter + signing) was disproportionate complexity for the scaffold milestone.
 
 ## Layout
@@ -30,31 +30,26 @@ src/
     alive.ts        # the "I am loaded" marker each surface logs
     alive.test.ts   # sample Vitest test
 manifest.base.json  # source of truth, transformed per-browser at build time
-scripts/
-  build-manifests.mjs
-  package.mjs       # zips chrome/edge/firefox into artifacts/
+vite.config.ts      # vite-plugin-web-extension build (per-browser, all four surfaces)
+vitest.config.ts    # unit test config
 public/             # static assets copied as-is into each dist (icons go here)
 ```
 
 ## Dev
 
-Requires Node 20+ (the dev orchestrator uses `fs.watch({recursive: true})`, which wasn't supported on Linux until Node 20).
+Requires Node 20+.
 
 ```sh
 npm install
-npm run build       # vite build + write per-browser manifests under dist/
+npm run build       # build dist/{chrome,edge,firefox}/
 npm test            # vitest
-npm run dev         # vite build --watch
+npm run dev         # rebuild dist/chrome/ on every source change
 npm run package     # build + zip artifacts/{chrome,edge,firefox}.zip
 ```
 
-**Note on `npm run package`:** there's a known intermittent failure on macOS + Node 24 where `zip` exits 12 ("Nothing to do!") when launched through the `npm run` chain. If you hit this, run the same chain directly:
-
-```sh
-npm run build && node scripts/package.mjs
-```
-
-This gets resolved when the hand-rolled build pipeline migrates to a proper WebExtension Vite plugin — see [#11](https://github.com/dhughes/colorthemap-browser-extension/issues/11).
+`npm run dev` builds Chrome into `dist/chrome/` and rebuilds on every edit; load it
+unpacked (see below) and hit reload after a change. To watch a different browser,
+run e.g. `TARGET_BROWSER=firefox vite build --watch`.
 
 ### Load the unpacked extension
 

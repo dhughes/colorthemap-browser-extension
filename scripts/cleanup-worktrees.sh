@@ -7,7 +7,12 @@
 # was closed without merging), commits any uncommitted changes and force-pushes the branch
 # to origin so the work isn't lost when the worktree is deleted.
 
-set -euo pipefail
+# Intentionally NOT using `set -e`: the script's contract is "each worktree
+# is independent — if one fails, log and continue to the next." Per-step
+# error handling is done explicitly via `if ! cmd; then continue; fi`
+# blocks inside the loop. Keep -u (unbound variables stay an error) and
+# pipefail (so a failed gh call in a pipeline doesn't get masked).
+set -uo pipefail
 
 MAIN_REPO="$(cd "$(dirname "$0")/.." && pwd)"
 WORKTREE_BASE="$HOME/.claude-worktrees/colorthemap-browser-extension"
@@ -189,28 +194,17 @@ for i in "${!to_clean[@]}"; do
         # signal was untracked files, there is nothing to commit — skip the
         # snapshot but DO continue to the push so existing committed work on
         # the branch still reaches origin.
-        # `git diff --quiet` exits 0 = clean, 1 = dirty, anything else = git
-        # error (corrupted index, bad gitlink, etc). Distinguish so a real
-        # repo problem doesn't silently get treated as "dirty" and produce a
-        # misleading WIP snapshot commit on top of a broken state.
-        # `|| diff_status=$?` keeps set -e from firing on the non-zero exit
-        # AND captures the real status for the check below.
-        tracked_dirty=false
-        diff_status=0
-        git -C "$dir" diff --quiet || diff_status=$?
-        if [ "$diff_status" -eq 1 ]; then
+        # `git diff-index --quiet HEAD --` reports whether the working tree
+        # (tracked files only) differs from HEAD in one call covering both
+        # staged AND unstaged changes. Exit 0 = clean, 1 = dirty, anything
+        # else = git error. On a real git error, fall through to the snapshot
+        # attempt: `git add -u` will surface the same error with a clearer
+        # message there, and we still push any prior committed work even if
+        # the snapshot fails.
+        if git -C "$dir" diff-index --quiet HEAD --; then
+            tracked_dirty=false
+        else
             tracked_dirty=true
-        elif [ "$diff_status" -ne 0 ]; then
-            echo "  WARNING: git diff failed (exit $diff_status); skipping this worktree." >&2
-            continue
-        fi
-        cached_status=0
-        git -C "$dir" diff --cached --quiet || cached_status=$?
-        if [ "$cached_status" -eq 1 ]; then
-            tracked_dirty=true
-        elif [ "$cached_status" -ne 0 ]; then
-            echo "  WARNING: git diff --cached failed (exit $cached_status); skipping this worktree." >&2
-            continue
         fi
 
         if [ "$tracked_dirty" = "true" ]; then

@@ -38,6 +38,8 @@ public/             # static assets copied as-is into each dist (icons go here)
 
 ## Dev
 
+Requires Node 20+ (the dev orchestrator uses `fs.watch({recursive: true})`, which wasn't supported on Linux until Node 20).
+
 ```sh
 npm install
 npm run build       # vite build + write per-browser manifests under dist/

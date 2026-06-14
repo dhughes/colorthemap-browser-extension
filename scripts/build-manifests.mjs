@@ -4,7 +4,10 @@ import { resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { REPO_ROOT, STAGING_DIR, DIST_DIR } from './paths.mjs';
 
-const variants = {
+// Single source of truth for browser variants. Adding Safari (#5) is one
+// entry here; the per-browser keys flow out to package.mjs's zip loop and
+// anywhere else that needs to iterate the list, so they can't drift.
+export const variants = {
   chrome: { transform: (m) => m },
   edge: { transform: (m) => m },
   firefox: {
@@ -23,11 +26,6 @@ const variants = {
     }),
   },
 };
-
-// Single source of truth for which browsers we support. Other scripts
-// (package.mjs's zip loop, etc.) import this rather than maintaining their
-// own list so adding Safari (#5) is a one-place change.
-export const BROWSERS = Object.keys(variants);
 
 // Filter out *.map sourcemaps and `.gitkeep` placeholders so each per-browser
 // dist (and the eventual store-listing zip) doesn't ship them. Sourcemaps
@@ -60,9 +58,14 @@ export async function buildManifests() {
 }
 
 // Run when invoked as a script (npm run build), not when imported.
-// `pathToFileURL(argv[1]).href` normalizes through symlinks so this guard is
-// stable under npm exec / pnpm / node_modules/.bin symlinks where argv[1]
-// would otherwise diverge from the canonical import.meta.url.
+// Stable under the common path-style differences argv[1] can have vs
+// import.meta.url (relative vs absolute, OS-specific separators):
+// pathToFileURL absolutizes argv[1] against cwd and url-encodes consistently
+// with how Node already encodes import.meta.url. Note: pathToFileURL is
+// lexical — it does NOT resolve symlinks. If anyone ever wires this script
+// through a node_modules/.bin symlink, the two URLs would diverge and the
+// guard would silently skip; today's only invocation is
+// `node scripts/build-manifests.mjs` from the repo root, where they agree.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   await buildManifests();
 }

@@ -2,7 +2,9 @@ import { mkdir, rm, stat } from 'node:fs/promises';
 import { spawn, spawnSync } from 'node:child_process';
 import { resolve, relative } from 'node:path';
 import { ARTIFACTS_DIR, DIST_DIR, REPO_ROOT } from './paths.mjs';
-import { BROWSERS } from './build-manifests.mjs';
+import { variants } from './build-manifests.mjs';
+
+const browsers = Object.keys(variants);
 
 // Fail fast if `zip` isn't installed — otherwise the first ENOENT happens
 // mid-loop after `rm` has already deleted the previous artifact, leaving
@@ -19,7 +21,7 @@ await mkdir(ARTIFACTS_DIR, { recursive: true });
 // Sequential: the three zips read from the same filesystem and write to the
 // same artifacts dir. Concurrent runs would contend for the disk queue and
 // triple peak RSS for marginal wall-time benefit. Keep it linear.
-for (const browser of BROWSERS) {
+for (const browser of browsers) {
   const sourceDir = resolve(DIST_DIR, browser);
   const outPath = resolve(ARTIFACTS_DIR, `${browser}.zip`);
   await rm(outPath, { force: true });
@@ -35,7 +37,12 @@ async function zipDirectory(sourceDir, outPath) {
     // this; this is defense-in-depth in case dist/ was hand-populated.
     // `*/.gitkeep` matches at any depth; `.gitkeep` matches at archive root.
     const args = ['-r', '-q', outPath, '.', '-x', '*.map', '-x', '.gitkeep', '-x', '*/.gitkeep'];
-    const child = spawn('zip', args, { cwd: sourceDir, stdio: 'inherit' });
+    // stdin must be 'ignore', not 'inherit'. Otherwise zip inherits the
+    // parent's stdin and on the second iteration (when `npm run package` has
+    // already drained/closed npm's stdin pipe) zip falls back to reading
+    // input filenames from stdin, sees EOF immediately, and exits 12 with
+    // "Nothing to do!" — even though `.` is right there on argv.
+    const child = spawn('zip', args, { cwd: sourceDir, stdio: ['ignore', 'inherit', 'inherit'] });
     child.on('error', rejectPromise);
     child.on('exit', (code) => {
       if (code === 0) resolvePromise();

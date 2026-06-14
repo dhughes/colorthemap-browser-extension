@@ -43,15 +43,13 @@ chmod 700 "$launch_script"
 # We CANNOT trap EXIT to delete the launch script: osascript returns the
 # moment AppleScript dispatches the "create window" message, but iTerm2 may
 # take noticeably longer (cold start, slow disk) to actually fork the zsh
-# that reads the script. An EXIT trap deletes the file before zsh sees it.
-# So the cleanup story is:
-#   1. INT/TERM trap covers user interruption between mktemp and osascript.
-#   2. `set -e` failure between mktemp and osascript: explicit ERR trap.
-#   3. osascript non-zero exit (iTerm not installed, AppleScript syntax err):
-#      explicit branch below removes the script.
-#   4. Happy path: launch script self-deletes on its first line as zsh exec's it.
-cleanup_launch_script() { rm -f "$launch_script"; }
-trap cleanup_launch_script INT TERM ERR
+# that reads the script. An EXIT trap would delete the file before zsh
+# sees it. Cleanup story for the failure paths:
+#   - INT/TERM: user interrupted between mktemp and osascript.
+#   - ERR: a command failed under `set -e` (e.g. chmod, printf %q).
+#   - osascript itself returns non-zero: explicit `||` branch below.
+#   - Happy path: launch script self-deletes on its first line as zsh execs it.
+trap 'rm -f "$launch_script"' INT TERM ERR
 
 WORKTREE_PATH_Q=$(printf '%q' "$WORKTREE_PATH")
 INITIAL_PROMPT_Q=$(printf '%q' "$INITIAL_PROMPT")
@@ -66,19 +64,8 @@ source ~/.zshrc 2>/dev/null || true
 exec $CLAUDE_BIN_Q $INITIAL_PROMPT_Q
 EOS
 
-# Disable -e for osascript so a non-zero exit can run cleanup, not abort
-# without the explicit handler we want to see.
-set +e
-osascript <<EOA
+osascript <<EOA || { osa_status=$?; rm -f "$launch_script"; echo "Error: osascript exited with status $osa_status. Is iTerm2 installed?" >&2; exit "$osa_status"; }
 tell application "iTerm2"
     create window with default profile command "$launch_script"
 end tell
 EOA
-osa_status=$?
-set -e
-
-if [ "$osa_status" -ne 0 ]; then
-    cleanup_launch_script
-    echo "Error: osascript exited with status $osa_status. Is iTerm2 installed?" >&2
-    exit "$osa_status"
-fi

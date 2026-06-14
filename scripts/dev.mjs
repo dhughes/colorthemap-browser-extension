@@ -11,10 +11,11 @@ import { existsSync } from 'node:fs';
 import { REPO_ROOT, STAGING_DIR } from './paths.mjs';
 import { buildManifests } from './build-manifests.mjs';
 
-// fs.watch with `recursive: true` was unsupported on Linux until Node 20.
-// The whole worktree workflow is macOS-gated anyway, but dev.mjs itself runs
-// wherever, so fail loudly with a useful message instead of silently watching
-// nothing.
+// package.json's `engines` field is advisory by default — npm only warns,
+// it doesn't block install, and bare `node scripts/dev.mjs` ignores it.
+// Re-check at the use site so a too-old runtime fails loudly here instead
+// of silently producing a no-op `fs.watch({recursive: true})` (unsupported
+// on Linux until Node 20).
 const [nodeMajor] = process.versions.node.split('.').map(Number);
 if (nodeMajor < 20) {
   console.error(`ERROR: Node ${process.versions.node} detected. scripts/dev.mjs requires Node 20+ for fs.watch({recursive: true}).`);
@@ -40,6 +41,7 @@ const watchers = [
 const children = [];
 let shuttingDown = false;
 let firstFailureCode = null;
+let stagingWatcher = null;
 
 const shutdown = (signal) => {
   if (shuttingDown) return;
@@ -52,6 +54,14 @@ const shutdown = (signal) => {
         // ESRCH if the child already died — fine.
       }
     }
+  }
+  // Close the FSWatcher too. Without this, the active fs.watch keeps the
+  // event loop alive after the children exit and the process hangs forever,
+  // ignoring process.exitCode entirely. Setting null lets a late event
+  // handler skip a closed watcher cleanly.
+  if (stagingWatcher) {
+    try { stagingWatcher.close(); } catch {}
+    stagingWatcher = null;
   }
 };
 
@@ -130,7 +140,7 @@ const scheduleFanOut = () => {
   }, 250);
 };
 
-watch(STAGING_DIR, { recursive: true }, (_eventType, filename) => {
+stagingWatcher = watch(STAGING_DIR, { recursive: true }, (_eventType, filename) => {
   if (!filename) return;
   // Ignore sourcemap-only writes — they're filtered out of the per-browser
   // dists anyway, so re-running fan-out for them would just re-copy the

@@ -37,7 +37,7 @@ public/             # static assets copied as-is into each dist (icons go here)
 
 ## Dev
 
-Requires Node 20+.
+Requires Node 20.19+ or 22.12+ (Vite 7's floor).
 
 ```sh
 npm install
@@ -49,7 +49,7 @@ npm run package     # build + zip artifacts/{chrome,edge,firefox}.zip
 
 `npm run dev` builds Chrome into `dist/chrome/` and rebuilds on every edit; load it
 unpacked (see below) and hit reload after a change. To watch a different browser,
-run e.g. `TARGET_BROWSER=firefox vite build --watch`.
+run e.g. `TARGET_BROWSER=firefox npx vite build --watch`.
 
 ### Load the unpacked extension
 

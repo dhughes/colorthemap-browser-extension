@@ -5,8 +5,15 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 
-// Single source of truth for the browser targets. Adding Safari (#5) is one
-// entry here plus its manifest shape below.
+// `vite build --watch` re-runs the plugin's buildStart on every rebuild, which
+// empties the outDir when emptyOutDir is set — leaving a window where the loaded
+// extension on disk is incomplete. One-shot builds clean up front via
+// `npm run clean`, so only empty the outDir when we're not watching.
+const isWatch = process.argv.includes('--watch');
+
+// The browser targets. Adding one (e.g. Safari #5) means: an entry here, its
+// manifest shape in generateManifest() below, and matching build:/package:
+// scripts in package.json (the npm scripts drive one target per invocation).
 const TARGETS = ['chrome', 'edge', 'firefox'] as const;
 type Target = (typeof TARGETS)[number];
 
@@ -52,7 +59,7 @@ export default defineConfig({
   publicDir: resolve(root, 'public'),
   build: {
     outDir: resolve(root, `dist/${target}`),
-    emptyOutDir: true,
+    emptyOutDir: !isWatch,
     sourcemap: true,
     target: 'es2022',
   },
@@ -64,6 +71,11 @@ export default defineConfig({
       // We load the unpacked extension manually (see README), so don't let
       // web-ext spawn a browser in watch/dev mode.
       disableAutoLaunch: true,
+      // Default validation fetches a JSON schema over the network with no
+      // timeout (and validates every target against the Chrome schema), which
+      // makes builds hang/fail non-deterministically off-network. `web-ext
+      // build` validates at package time instead.
+      skipManifestValidation: true,
       // Rebuild when the manifest source changes, not just src/ entries.
       watchFilePaths: [resolve(root, 'manifest.base.json')],
     }),

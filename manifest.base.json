@@ -18,6 +18,11 @@
     },
     {
       "matches": ["<all_urls>"],
+      "js": ["detectors/detector-a-bridge.ts"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["<all_urls>"],
       "js": ["detectors/detector-a-main.ts"],
       "run_at": "document_start",
       "world": "MAIN"

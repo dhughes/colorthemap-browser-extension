@@ -24,3 +24,7 @@ export function initDetectorABridge(): void {
     });
   });
 }
+
+// Its own content script at document_start so the listener is registered before
+// the main-world wrap (also document_start) can post an early detection.
+initDetectorABridge();

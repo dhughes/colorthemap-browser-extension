@@ -41,6 +41,12 @@ browser.runtime.onMessage.addListener((message: unknown) =>
   handleAuthMessage(message),
 );
 
+// The toolbar button has no popup — clicking it opens the settings page, the
+// single hub for connecting and (later) per-site config.
+browser.action.onClicked.addListener(() => {
+  void browser.runtime.openOptionsPage();
+});
+
 // GPS-download detection (#4): every detector funnels into one deduped log.
 const recent = createRecentDetections();
 

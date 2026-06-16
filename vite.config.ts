@@ -33,12 +33,14 @@ if (!isTarget(target)) {
 // filenames.
 //
 // Firefox MV3 rejects `background.service_worker` — it wants `background.scripts`
-// — and needs a `browser_specific_settings.gecko` block. Chrome and Edge share
-// the base shape.
+// — and needs a `browser_specific_settings.gecko` block. The base manifest's
+// `key` (which pins the Chromium dev extension ID) is meaningless to Firefox,
+// which identifies via `gecko.id`, so it's dropped from the Firefox variant.
+// Chrome and Edge share the base shape.
 function generateManifest() {
   const base = readJsonFile(resolve(root, "manifest.base.json"));
   if (target === "firefox") {
-    return {
+    const firefoxManifest = {
       ...base,
       background: {
         scripts: ["background.ts"],
@@ -52,6 +54,8 @@ function generateManifest() {
         },
       },
     };
+    delete firefoxManifest.key;
+    return firefoxManifest;
   }
   return base;
 }

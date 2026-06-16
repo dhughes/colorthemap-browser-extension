@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Color The Map Importer — Options</title>
+    <title>Color The Map Importer</title>
     <style>
       body {
         font:
@@ -11,24 +11,138 @@
           "Segoe UI",
           sans-serif;
         max-width: 520px;
-        margin: 40px auto;
+        margin: 48px auto;
         padding: 0 24px;
         color: #222;
       }
       h1 {
-        font-size: 18px;
+        font-size: 20px;
+        margin: 0 0 4px;
       }
-      p {
-        color: #555;
+      .tagline {
+        color: #666;
+        margin: 0 0 28px;
+      }
+      h2 {
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #888;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 6px;
+        margin: 32px 0 16px;
+      }
+      button {
+        font: inherit;
+        padding: 10px 18px;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        cursor: pointer;
+      }
+      .primary {
+        background: #2d7d46;
+        color: #fff;
+        font-weight: 600;
+        font-size: 15px;
+      }
+      .secondary {
+        background: #fff;
+        border-color: #ccc;
+        color: #333;
+      }
+      [hidden] {
+        display: none;
+      }
+      .welcome {
+        background: #eef6f0;
+        border: 1px solid #cfe6d6;
+        border-radius: 10px;
+        padding: 16px 20px;
+        margin-bottom: 8px;
+      }
+      .welcome h2 {
+        border: 0;
+        text-transform: none;
+        letter-spacing: 0;
+        color: #1f5c33;
+        font-size: 16px;
+        margin: 0 0 6px;
+        padding: 0;
+      }
+      .welcome p {
+        margin: 0;
+        color: #2f4f3a;
+      }
+      .signup {
+        display: inline-block;
+        margin-top: 14px;
+        font-size: 13px;
+      }
+      .account {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 18px;
+      }
+      .avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: #e6e6e6;
+        object-fit: cover;
+        flex: none;
+      }
+      .email {
+        font-weight: 600;
+        word-break: break-all;
+      }
+      .connected-label {
+        color: #2d7d46;
+        font-size: 12px;
+      }
+      .placeholder {
+        color: #888;
       }
     </style>
   </head>
   <body>
-    <h1>Color The Map Importer — Options</h1>
-    <p>
-      No settings yet. This page is a placeholder so the manifest's
-      <code>options_ui</code> entry has a target.
+    <h1>Color The Map Importer</h1>
+    <p class="tagline">
+      Send the GPS files you download straight to Color The Map.
     </p>
+
+    <section id="welcome" class="welcome" hidden>
+      <h2>Welcome!</h2>
+      <p>
+        Connect your Color The Map account below to start importing GPS files.
+      </p>
+    </section>
+
+    <section id="logged-out" hidden>
+      <p>Connect your account to get started.</p>
+      <button id="connect" class="primary">Connect to Color The Map</button>
+      <a id="signup" class="signup" href="#" target="_blank" rel="noopener">
+        Don't have an account? Sign up at colorthemap.app
+      </a>
+    </section>
+
+    <section id="logged-in" hidden>
+      <h2>Account</h2>
+      <div class="account">
+        <img id="avatar" class="avatar" alt="" />
+        <div>
+          <div id="email" class="email"></div>
+          <div class="connected-label">Connected</div>
+        </div>
+      </div>
+      <button id="disconnect" class="secondary">Disconnect</button>
+
+      <h2>Settings</h2>
+      <p class="placeholder">
+        Per-site import preferences will live here in a later release.
+      </p>
+    </section>
+
     <script type="module" src="./options.ts"></script>
   </body>
 </html>

@@ -1,4 +1,7 @@
 import browser from "webextension-polyfill";
+import { registerAlarmListener, registerRefreshAlarm } from "./auth/alarms";
+import { handleAuthMessage } from "./auth/handler";
+import { refreshIfNeeded } from "./auth/service";
 import { aliveMessage } from "./shared/alive";
 import { onDetection } from "./shared/bus";
 import { createRecentDetections } from "./shared/dedupe";
@@ -11,6 +14,33 @@ import { initDetectorB } from "./detectors/detector-b";
 
 console.log(aliveMessage("background"));
 
+// Register every event listener synchronously and first, before any call that
+// could throw — an MV3/event-page background must have its listeners attached
+// during initial evaluation or it misses startup-time events (onInstalled).
+
+browser.runtime.onInstalled.addListener((details) => {
+  console.log(aliveMessage("background"), "onInstalled", details.reason);
+  if (details.reason === "install") {
+    // Greet first-time users on the options page with a welcome + Connect CTA.
+    browser.tabs
+      .create({ url: browser.runtime.getURL("options.html?welcome=1") })
+      .catch((err) => console.error("welcome tab failed to open", err));
+  }
+});
+
+// On SW boot, refresh up front so we don't declare "authenticated" with a
+// token that's about to expire.
+browser.runtime.onStartup.addListener(() => {
+  void refreshIfNeeded();
+});
+
+// Auth entry points (install, options, detector surfaces) converge here:
+// surfaces post a typed message; the SW owns the flow.
+browser.runtime.onMessage.addListener((message: unknown) =>
+  handleAuthMessage(message),
+);
+
+// GPS-download detection (#4): every detector funnels into one deduped log.
 const recent = createRecentDetections();
 
 function handleDetection(message: DetectionMessage): void {
@@ -23,10 +53,7 @@ function handleDetection(message: DetectionMessage): void {
 onDetection(handleDetection);
 initDetectorB((payload) => handleDetection(createDetectionMessage(payload)));
 
-browser.runtime.onInstalled.addListener((details) => {
-  console.log(aliveMessage("background"), "onInstalled", details.reason);
-});
+registerAlarmListener();
 
-browser.runtime.onStartup.addListener(() => {
-  console.log(aliveMessage("background"), "onStartup");
-});
+// Periodic proactive refresh so a long-open session never silently expires.
+registerRefreshAlarm();

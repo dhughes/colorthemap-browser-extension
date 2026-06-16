@@ -86,6 +86,42 @@
     </section>
 
     <section>
+      <h2>Negative cases — badge appears, but it must NOT send</h2>
+      <p>
+        These links carry a GPS extension (so Detector C badges them), but the
+        linked content is <em>not</em> GPS data. Clicking each badge should log
+        <code>[detector:C] would NOT send … to CTM (linked resource is not GPS
+        data)</code>. Saving any of them (Detector B) is the known
+        metadata-only blind spot — it will still log <code>would send</code>
+        because the downloads API exposes no body to validate.
+      </p>
+      <ul>
+        <li>
+          <a href="./negatives/webpage.gpx">negatives/webpage.gpx</a> — an HTML
+          page named <code>.gpx</code>.
+        </li>
+        <li>
+          <a href="./negatives/styled-blob.gpx">negatives/styled-blob.gpx</a> —
+          JSON that <em>quotes</em> <code>&lt;gpx&gt;</code> text (the shape
+          GitHub’s <code>/_styled</code> returns). The structural sniff must not
+          be fooled.
+        </li>
+        <li>
+          <a href="./negatives/notes.tcx">negatives/notes.tcx</a> — valid XML
+          whose root is <code>&lt;notes&gt;</code>, not TrainingCenterDatabase.
+        </li>
+        <li>
+          <a href="./negatives/empty.kml">negatives/empty.kml</a> — plain text
+          named <code>.kml</code>.
+        </li>
+        <li>
+          <a href="./negatives/fake.kmz">negatives/fake.kmz</a> — plain text
+          named <code>.kmz</code> (no zip <code>PK</code> signature).
+        </li>
+      </ul>
+    </section>
+
+    <section>
       <h2>Detector A — same-origin fetch / XHR (works locally)</h2>
       <p>
         Detector A wraps the page’s own <code>fetch</code>/XHR. These calls are
@@ -111,6 +147,11 @@
           <button data-fetch="./files/fit-export-endpoint?token=abc">fetch FIT (binary), no extension</button>
           → <code>source=fetch</code>, binary body-sniff (the <code>.FIT</code>
           marker at offset 8).
+        </li>
+        <li>
+          <button data-fetch="./negatives/styled-blob.gpx">fetch JSON that embeds &lt;gpx&gt;</button>
+          → expect <strong>no log</strong>: the body is JSON, so the sniff
+          rejects it despite the <code>.gpx</code> URL.
         </li>
       </ul>
     </section>

@@ -1,0 +1,13 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Not a GPX</title>
+  </head>
+  <body>
+    <h1>This is an HTML page, not GPS data.</h1>
+    <p>
+      It is named <code>.gpx</code> so Detector C will badge it, but clicking
+      the badge must reject it on content and log "would NOT send".
+    </p>
+  </body>
+</html>

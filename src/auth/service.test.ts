@@ -250,4 +250,19 @@ describe("startAuthFlow", () => {
     await expect(startAuthFlow()).rejects.toBeInstanceOf(AuthorizationFailed);
     expect(api.exchangeCode).not.toHaveBeenCalled();
   });
+
+  it("persists nothing if the profile fetch fails (no orphan tokens)", async () => {
+    vi.mocked(browser.identity.launchWebAuthFlow).mockImplementation(
+      async (details) => {
+        const state = new URL(details.url).searchParams.get("state");
+        return `${REDIRECT}?code=auth-code&state=${state}`;
+      },
+    );
+    vi.mocked(api.exchangeCode).mockResolvedValue(tokenSet());
+    vi.mocked(api.fetchProfile).mockRejectedValue(new Error("profile 500"));
+
+    await expect(startAuthFlow()).rejects.toThrow();
+    expect(storage.setTokens).not.toHaveBeenCalled();
+    expect(storage.setProfile).not.toHaveBeenCalled();
+  });
 });

@@ -2,18 +2,18 @@ import { describe, expect, it } from "vitest";
 import {
   AUTH_MESSAGE_TYPES,
   authStateChanged,
-  getAuthState,
+  getAuthStateMessage,
   isAuthMessage,
-  logout,
-  startAuth,
+  logoutMessage,
+  startAuthMessage,
   type AuthState,
 } from "./messages";
 
 describe("auth message creators", () => {
   it("stamp the correct discriminator type", () => {
-    expect(startAuth().type).toBe(AUTH_MESSAGE_TYPES.startAuth);
-    expect(logout().type).toBe(AUTH_MESSAGE_TYPES.logout);
-    expect(getAuthState().type).toBe(AUTH_MESSAGE_TYPES.getAuthState);
+    expect(startAuthMessage().type).toBe(AUTH_MESSAGE_TYPES.startAuth);
+    expect(logoutMessage().type).toBe(AUTH_MESSAGE_TYPES.logout);
+    expect(getAuthStateMessage().type).toBe(AUTH_MESSAGE_TYPES.getAuthState);
   });
 
   it("carries the auth state on a state-changed broadcast", () => {
@@ -26,9 +26,9 @@ describe("auth message creators", () => {
 
 describe("isAuthMessage", () => {
   it("accepts every known auth message", () => {
-    expect(isAuthMessage(startAuth())).toBe(true);
-    expect(isAuthMessage(logout())).toBe(true);
-    expect(isAuthMessage(getAuthState())).toBe(true);
+    expect(isAuthMessage(startAuthMessage())).toBe(true);
+    expect(isAuthMessage(logoutMessage())).toBe(true);
+    expect(isAuthMessage(getAuthStateMessage())).toBe(true);
     expect(isAuthMessage(authStateChanged({ status: "unauthenticated" }))).toBe(
       true,
     );

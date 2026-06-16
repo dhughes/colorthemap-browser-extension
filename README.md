@@ -115,8 +115,9 @@ Clicking **Connect** opens CTM's `/oauth/authorize` page via
 `chrome.identity.launchWebAuthFlow`; after sign-in the extension exchanges the
 code at `/oauth/token` and stores the tokens in the background service worker
 (silent, proactive refresh; single account at a time). The target CTM origin is
-a build-time constant — **dev builds point at `https://dev.colorthemap.app`**,
-production at `https://colorthemap.app`.
+selected at build time via the `VITE_CTM_BASE_URL` env var — it **defaults to
+`https://dev.colorthemap.app`**; set `VITE_CTM_BASE_URL=https://colorthemap.app`
+for a production build.
 
 ### Deploy coordination (required before auth works) ⚠️
 

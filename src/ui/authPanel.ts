@@ -2,10 +2,10 @@ import browser from "webextension-polyfill";
 import { CTM_BASE_URL } from "../auth/config";
 import {
   AUTH_MESSAGE_TYPES,
-  getAuthState,
+  getAuthStateMessage,
   isAuthMessage,
-  logout,
-  startAuth,
+  logoutMessage,
+  startAuthMessage,
   type AuthState,
 } from "../auth/messages";
 
@@ -45,7 +45,7 @@ const LOGGED_OUT: AuthView = {
 
 export function connectAuthPanel(render: (view: AuthView) => void): void {
   void browser.runtime
-    .sendMessage(getAuthState())
+    .sendMessage(getAuthStateMessage())
     .then((state) =>
       render(state ? toAuthView(state as AuthState) : LOGGED_OUT),
     )
@@ -63,9 +63,9 @@ export function connectAuthPanel(render: (view: AuthView) => void): void {
 }
 
 export function requestConnect(): Promise<unknown> {
-  return browser.runtime.sendMessage(startAuth());
+  return browser.runtime.sendMessage(startAuthMessage());
 }
 
 export function requestDisconnect(): Promise<unknown> {
-  return browser.runtime.sendMessage(logout());
+  return browser.runtime.sendMessage(logoutMessage());
 }

@@ -2,11 +2,13 @@ export const CLIENT_ID = "ctm-browser-extension";
 
 export const SCOPE = "ctm:full";
 
-// Color The Map origin the extension talks to. Dev points at the
-// valid-TLS dev deployment; the production build flips this to
-// https://colorthemap.app when packaging lands (#7 / #8). Kept as a single
-// switch point so api.ts callers stay pure (they receive the base URL).
-export const CTM_BASE_URL = "https://dev.colorthemap.app";
+// Color The Map origin the extension talks to. Selected at build time so a
+// production build can't silently ship pointed at dev: set VITE_CTM_BASE_URL
+// (e.g. https://colorthemap.app) for the prod build; it defaults to the
+// valid-TLS dev deployment otherwise. api.ts callers stay pure (they receive
+// the base URL).
+export const CTM_BASE_URL =
+  import.meta.env.VITE_CTM_BASE_URL ?? "https://dev.colorthemap.app";
 
 // Token is considered stale this many ms before its actual expiry, so a
 // refresh happens before a request can fail mid-flight.

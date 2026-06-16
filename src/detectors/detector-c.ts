@@ -5,6 +5,15 @@ import { isDetectionEnabledForHost } from "../shared/gate";
 
 const BADGE_HOST_TAG = "ctm-import-badge";
 
+// Brand colors mirror CTM's design tokens (--color-primary / -hover and
+// --color-primary-shadow in src/styles/tokens.css). They're inlined as literals
+// rather than var(--token) because this badge is injected into arbitrary
+// third-party pages whose :root carries no CTM tokens. Keep in sync with
+// tokens.css when the brand color changes.
+const BRAND = "#ff00ff";
+const BRAND_HOVER = "#cc00cc";
+const BRAND_SHADOW = "rgba(255, 0, 255, 0.2)";
+
 const badged = new WeakSet<HTMLAnchorElement>();
 let observer: MutationObserver | null = null;
 
@@ -23,14 +32,14 @@ function buildBadge(link: HTMLAnchorElement, format: GpsFormat): HTMLElement {
       font: 600 11px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       letter-spacing: -0.01em;
       color: #fff;
-      background: #ff00ff;
+      background: ${BRAND};
       border-radius: 8px;
       padding: 3px 8px;
       margin-inline-start: 6px;
       vertical-align: middle;
-      box-shadow: 0 2px 8px rgba(255, 0, 255, 0.2);
+      box-shadow: 0 2px 8px ${BRAND_SHADOW};
     }
-    button:hover { background: #cc00cc; }
+    button:hover { background: ${BRAND_HOVER}; }
   `;
 
   const button = document.createElement("button");

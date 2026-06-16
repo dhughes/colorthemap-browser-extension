@@ -28,12 +28,13 @@ export async function isAuthenticated(): Promise<boolean> {
   return (await getAuthState()).status === "authenticated";
 }
 
-export async function broadcastAuthState(): Promise<void> {
-  const state = await getAuthState();
+// Callers always know the state they just produced (login/logout/refresh
+// failure), so they pass it in — no storage round-trip to reconstruct it.
+export async function broadcastAuthState(state: AuthState): Promise<void> {
   try {
     await browser.runtime.sendMessage(authStateChanged(state));
   } catch {
-    // No surface is listening (no open popup / options / content script).
+    // No surface is listening (no open options page / content script).
     // sendMessage rejects in that case — expected, not an error.
   }
 }
@@ -84,7 +85,7 @@ async function doRefresh(tokens: Tokens): Promise<TokenSet> {
     // Refresh rejected (rotated/expired/revoked). Wipe and tell every surface
     // to show logged-out. Do not auto-reopen OAuth.
     await storage.clearAuth();
-    await broadcastAuthState();
+    await broadcastAuthState({ status: "unauthenticated" });
     throw new TokenExpired("Your session has expired", { cause });
   }
   await storage.setTokens(next);
@@ -92,6 +93,11 @@ async function doRefresh(tokens: Tokens): Promise<TokenSet> {
 }
 
 export async function startAuthFlow(): Promise<void> {
+  // verifier/state/redirectUri live only in this SW invocation. launchWebAuthFlow
+  // keeps the flow in a browser window, but if the MV3 service worker is evicted
+  // mid-flow the in-flight exchange is lost and the user just re-clicks Connect.
+  // Full resumability (persisting these to storage.session + a redirect listener)
+  // is out of scope here; the failure mode is a benign retry, not a wrong result.
   const redirectUri = browser.identity.getRedirectURL();
   const { verifier, challenge } = await generatePkcePair();
   const state = generateState();
@@ -130,15 +136,19 @@ export async function startAuthFlow(): Promise<void> {
     redirectUri,
     codeVerifier: verifier,
   });
-  await storage.setTokens(tokens);
 
+  // Fetch the profile BEFORE persisting anything: getAuthState requires both
+  // tokens and profile, so storing tokens first and then failing the profile
+  // fetch would leave orphan tokens that read as logged-out yet keep getting
+  // refreshed. Persist them together so the flow is all-or-nothing.
   const profile = await api.fetchProfile({
     baseUrl: CTM_BASE_URL,
     accessToken: tokens.accessToken,
   });
+  await storage.setTokens(tokens);
   await storage.setProfile(profile);
 
-  await broadcastAuthState();
+  await broadcastAuthState({ status: "authenticated", profile });
 
   // The OAuth window just closed with no other signal. Bring the settings page
   // forward (focuses the existing tab, or opens one) so the user lands on their
@@ -151,5 +161,5 @@ export async function logout(): Promise<void> {
   // wipe tokens + profile. The user clicked disconnect — never leave stale
   // state, even if a future server call were to fail.
   await storage.clearAuth();
-  await broadcastAuthState();
+  await broadcastAuthState({ status: "unauthenticated" });
 }

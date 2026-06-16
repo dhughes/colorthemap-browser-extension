@@ -48,13 +48,15 @@ export function isAuthMessage(value: unknown): value is AuthMessage {
   );
 }
 
-export const startAuth = (): StartAuthMessage => ({
+// `Message` suffix keeps these message creators distinct from the
+// same-named service functions (startAuthFlow/logout/getAuthState).
+export const startAuthMessage = (): StartAuthMessage => ({
   type: AUTH_MESSAGE_TYPES.startAuth,
 });
-export const logout = (): LogoutMessage => ({
+export const logoutMessage = (): LogoutMessage => ({
   type: AUTH_MESSAGE_TYPES.logout,
 });
-export const getAuthState = (): GetAuthStateMessage => ({
+export const getAuthStateMessage = (): GetAuthStateMessage => ({
   type: AUTH_MESSAGE_TYPES.getAuthState,
 });
 export const authStateChanged = (

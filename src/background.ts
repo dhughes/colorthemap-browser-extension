@@ -29,8 +29,8 @@ browser.runtime.onInstalled.addListener((details) => {
   }
 });
 
-// On SW boot, refresh up front so we don't declare "authenticated" with a
-// token that's about to expire.
+// On browser launch, refresh up front so we don't declare "authenticated"
+// with a token that's about to expire.
 browser.runtime.onStartup.addListener(() => {
   void refreshIfNeeded();
 });
@@ -47,6 +47,11 @@ browser.action.onClicked.addListener(() => {
   void browser.runtime.openOptionsPage();
 });
 
+// Alarm wiring is registered before the detection setup below so a throw in
+// detector init can't prevent the periodic refresh from being scheduled.
+registerAlarmListener();
+registerRefreshAlarm();
+
 // GPS-download detection (#4): every detector funnels into one deduped log.
 const recent = createRecentDetections();
 
@@ -60,7 +65,7 @@ function handleDetection(message: DetectionMessage): void {
 onDetection(handleDetection);
 initDetectorB((payload) => handleDetection(createDetectionMessage(payload)));
 
-registerAlarmListener();
-
-// Periodic proactive refresh so a long-open session never silently expires.
-registerRefreshAlarm();
+// onStartup only fires on browser launch; an evicted MV3 SW re-spun by any
+// event also needs the proactive check, so run it on every SW evaluation
+// (single-flight in the service dedups any overlap with the alarm).
+void refreshIfNeeded();

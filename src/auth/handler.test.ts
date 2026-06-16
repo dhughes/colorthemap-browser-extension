@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   authStateChanged,
-  getAuthState as getAuthStateMessage,
-  logout as logoutMessage,
-  startAuth as startAuthMessage,
+  getAuthStateMessage,
+  logoutMessage,
+  startAuthMessage,
 } from "./messages";
 import * as service from "./service";
 import { handleAuthMessage } from "./handler";

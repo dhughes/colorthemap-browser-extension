@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CTM Importer — detection test fixtures</title>
+    <style>
+      body {
+        font: 15px/1.5 system-ui, sans-serif;
+        max-width: 48rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      section {
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+      }
+      h2 {
+        margin-top: 0;
+        font-size: 1rem;
+      }
+      code {
+        background: #f2f2f2;
+        padding: 0 4px;
+        border-radius: 3px;
+      }
+      button {
+        font: inherit;
+        padding: 4px 10px;
+      }
+      ul {
+        margin: 0.5rem 0;
+      }
+      .note {
+        background: #fff8e1;
+        border: 1px solid #f0d98c;
+        border-radius: 6px;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>CTM Importer detection test fixtures</h1>
+    <p>
+      Load the unpacked extension, open the background service-worker console,
+      then work through each section. Serve this page over HTTP (e.g.
+      <code>npx http-server test-fixtures</code>).
+    </p>
+
+    <p class="note">
+      <strong>Use real exports — not hand-made files.</strong> Drop genuine GPS
+      files exported from real services into <code>test-fixtures/files/</code>
+      using the names below. They are git-ignored on purpose: real exports carry
+      personal location data and must never be committed.
+    </p>
+
+    <section>
+      <h2>Detectors C &amp; B — real files (drop into <code>files/</code>)</h2>
+      <p>
+        Expect a “Send to CTM” badge next to each link (Detector C). Right-click
+        → “Save Link As” on any of them for Detector B
+        (<code>[detector:B] … source=download</code>, Chrome/Edge only).
+      </p>
+      <ul>
+        <li><a href="./files/sample.gpx">files/sample.gpx</a></li>
+        <li><a href="./files/sample.fit">files/sample.fit</a></li>
+        <li><a href="./files/sample.tcx">files/sample.tcx</a></li>
+        <li><a href="./files/sample.kml">files/sample.kml</a></li>
+        <li><a href="./files/sample.kmz">files/sample.kmz</a></li>
+        <li>
+          Query-string variant:
+          <a href="./files/sample.gpx?token=abc123">files/sample.gpx?token=…</a>
+        </li>
+        <li>Control (no badge expected): <a href="./index.html">index.html</a></li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Detector C — dynamically added link (MutationObserver)</h2>
+      <p>A badge should appear on the link the moment it is inserted.</p>
+      <button id="add-link">Add a GPX link via JS</button>
+      <div id="dynamic-target"></div>
+    </section>
+
+    <section>
+      <h2>Detector A — verify on real sites (not here)</h2>
+      <p>
+        Detector A wraps the <em>page’s own</em> <code>fetch</code>/XHR, and
+        cross-origin requests from this local page are blocked by CORS before
+        the wrap sees a usable response. So Detector A must be exercised on the
+        real sites whose same-origin export calls it is designed to catch:
+      </p>
+      <ul>
+        <li>
+          <strong>Komoot</strong> — open a tour, click <em>Export GPX</em>.
+          Expect <code>[detector:A] … source=fetch</code> after the response
+          completes (POST → bytes, no <code>.gpx</code> in the URL).
+        </li>
+        <li>
+          <strong>Strava</strong> — an activity’s <em>Export GPX</em>
+          (<code>/activities/&lt;id&gt;/export_gpx</code>, no extension in the
+          path — exercises content-type / content-disposition sniffing).
+        </li>
+        <li>
+          <strong>Garmin Connect / AllTrails / Ride with GPS</strong> — any
+          in-page GPX/TCX/KML export button.
+        </li>
+        <li>
+          At least one site that exports via <code>XMLHttpRequest</code> rather
+          than <code>fetch</code> → expect <code>source=xhr</code>.
+        </li>
+      </ul>
+    </section>
+
+    <script>
+      document.getElementById("add-link").addEventListener("click", () => {
+        const a = document.createElement("a");
+        a.href = "./files/sample.kml";
+        a.textContent = "dynamically-added sample.kml";
+        document.getElementById("dynamic-target").append(a);
+      });
+    </script>
+  </body>
+</html>

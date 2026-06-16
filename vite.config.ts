@@ -47,7 +47,8 @@ function generateManifest() {
       browser_specific_settings: {
         gecko: {
           id: "ctm-importer@colorthemap.app",
-          strict_min_version: "121.0",
+          // Detector A's `world: "MAIN"` content script needs Firefox 128+.
+          strict_min_version: "128.0",
         },
       },
     };

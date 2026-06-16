@@ -4,7 +4,7 @@
   "short_name": "CTM Importer",
   "version": "0.0.0",
   "description": "Detect GPS file downloads (GPX, FIT, TCX, KML, KMZ) and offer to import them into Color The Map.",
-  "permissions": [],
+  "permissions": ["downloads"],
   "host_permissions": [],
   "background": {
     "service_worker": "background.ts",
@@ -15,6 +15,12 @@
       "matches": ["<all_urls>"],
       "js": ["content.ts"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["detectors/detector-a-main.ts"],
+      "run_at": "document_idle",
+      "world": "MAIN"
     }
   ],
   "action": {

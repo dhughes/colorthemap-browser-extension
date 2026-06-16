@@ -57,6 +57,42 @@ describe("classifyResponse", () => {
     expect(result).toBeNull();
   });
 
+  it("does not trust a .gpx URL when the response is HTML (GitHub SPA route)", async () => {
+    const result = await classifyResponse({
+      url: "https://github.com/owner/repo/blob/master/Campsites/archies_fr.gpx",
+      contentType: "text/html; charset=utf-8",
+      body: stream("<!doctype html><html><body>file page</body></html>"),
+    });
+    expect(result).toBeNull();
+  });
+
+  it("does not trust a .gpx URL when the response is JSON metadata", async () => {
+    const result = await classifyResponse({
+      url: "https://github.com/owner/repo/latest-commit/master/x/archies_fr.gpx",
+      contentType: "application/json",
+      body: stream('{"oid":"abc"}'),
+    });
+    expect(result).toBeNull();
+  });
+
+  it("still classifies a real GPX served correctly (not vetoed)", async () => {
+    const result = await classifyResponse({
+      url: "https://example.com/route.gpx",
+      contentType: "application/gpx+xml",
+      body: null,
+    });
+    expect(result).toBe("gpx");
+  });
+
+  it("falls through to sniff when content-type lies but the body really is GPX", async () => {
+    const result = await classifyResponse({
+      url: "https://example.com/route.gpx",
+      contentType: "text/html",
+      body: stream(GPX),
+    });
+    expect(result).toBe("gpx");
+  });
+
   it("does not read the body when no signal hints at GPS", async () => {
     let read = false;
     const watched = new ReadableStream<Uint8Array>(

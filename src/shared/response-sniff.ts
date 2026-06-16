@@ -1,4 +1,4 @@
-import { classifyByMetadata } from "./classify";
+import { classifyByMetadata, isRenderedNonGpsContentType } from "./classify";
 import { filenameFromContentDisposition } from "./detection-url";
 import type { GpsFormat } from "./formats";
 import { shouldSniffBody, sniffBytes } from "./sniff";
@@ -49,13 +49,19 @@ export async function classifyResponse(
     ? (filenameFromContentDisposition(input.contentDisposition) ?? undefined)
     : undefined;
 
-  const cheap = classifyByMetadata({
-    url: input.url,
-    filename,
-    contentType: input.contentType,
-  });
-  if (cheap) {
-    return cheap;
+  // A rendered content-type (HTML/JSON/…) means a .gpx-suffixed URL is an SPA
+  // route, not a file — don't trust the extension; confirm by sniffing instead.
+  const trustMetadata =
+    !input.contentType || !isRenderedNonGpsContentType(input.contentType);
+  if (trustMetadata) {
+    const cheap = classifyByMetadata({
+      url: input.url,
+      filename,
+      contentType: input.contentType,
+    });
+    if (cheap) {
+      return cheap;
+    }
   }
 
   if (

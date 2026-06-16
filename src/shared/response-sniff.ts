@@ -1,6 +1,4 @@
-import { classifyByMetadata, isRenderedNonGpsContentType } from "./classify";
-import { filenameFromContentDisposition } from "./detection-url";
-import type { GpsFormat } from "./formats";
+import { formatForMimeType, type GpsFormat } from "./formats";
 import { shouldSniffBody, sniffBytes } from "./sniff";
 
 const SNIFF_HEAD_BYTES = 512;
@@ -39,44 +37,35 @@ async function readHead(
 }
 
 // The shared detection flow for a streamed response, used by both the fetch and
-// XHR wraps: try the cheap metadata signals first (extension, then MIME — see
-// classifyByMetadata), and only read the body to magic-byte sniff when a hint
-// says it could be GPS. Transport-agnostic: callers just supply a byte stream.
+// XHR wraps. The URL extension, filename, and content-type are only *candidate*
+// signals — a path ending in .gpx can be served arbitrary bytes (a JSON/HTML
+// SPA route, a redirect page, anything). So those signals decide whether a
+// response is worth inspecting; the response body is what actually confirms it.
+// Transport-agnostic: callers just supply a byte stream.
 export async function classifyResponse(
   input: ResponseSniffInput,
 ): Promise<GpsFormat | null> {
-  const filename = input.contentDisposition
-    ? (filenameFromContentDisposition(input.contentDisposition) ?? undefined)
-    : undefined;
+  const hints = {
+    url: input.url,
+    contentType: input.contentType,
+    contentDisposition: input.contentDisposition,
+  };
 
-  // A rendered content-type (HTML/JSON/…) means a .gpx-suffixed URL is an SPA
-  // route, not a file — don't trust the extension; confirm by sniffing instead.
-  const trustMetadata =
-    !input.contentType || !isRenderedNonGpsContentType(input.contentType);
-  if (trustMetadata) {
-    const cheap = classifyByMetadata({
-      url: input.url,
-      filename,
-      contentType: input.contentType,
-    });
-    if (cheap) {
-      return cheap;
-    }
-  }
-
-  if (
-    !input.body ||
-    !shouldSniffBody({
-      url: input.url,
-      contentType: input.contentType,
-      contentDisposition: input.contentDisposition,
-    })
-  ) {
+  // Not even a candidate — no extension/MIME/disposition hint says GPS.
+  if (!shouldSniffBody(hints)) {
     return null;
   }
 
-  return sniffBytes(await readHead(input.body), {
-    url: input.url,
-    contentType: input.contentType,
-  });
+  // Confirm with the actual bytes before claiming anything. The sniff either
+  // verifies the candidate or rejects it (e.g. a .gpx URL that returns JSON).
+  if (input.body) {
+    return sniffBytes(await readHead(input.body), {
+      url: input.url,
+      contentType: input.contentType,
+    });
+  }
+
+  // No body to validate (e.g. a HEAD response). Trust only an explicit GPS
+  // content-type the server deliberately set — never the URL extension alone.
+  return input.contentType ? formatForMimeType(input.contentType) : null;
 }

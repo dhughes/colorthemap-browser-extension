@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyByMetadata, isRenderedNonGpsContentType } from "./classify";
+import { classifyByMetadata } from "./classify";
 
 describe("classifyByMetadata", () => {
   it("uses the URL path extension as the first signal", () => {
@@ -43,36 +43,5 @@ describe("classifyByMetadata", () => {
       }),
     ).toBeNull();
     expect(classifyByMetadata({})).toBeNull();
-  });
-});
-
-describe("isRenderedNonGpsContentType", () => {
-  it("flags rendered web-resource types that a .gpx URL must not be trusted over", () => {
-    for (const type of [
-      "text/html",
-      "text/html; charset=utf-8",
-      "application/json",
-      "application/vnd.github+json",
-      "text/css",
-      "application/javascript",
-      "image/png",
-      "font/woff2",
-    ]) {
-      expect(isRenderedNonGpsContentType(type)).toBe(true);
-    }
-  });
-
-  it("does not flag types a real GPS file can legitimately arrive as", () => {
-    for (const type of [
-      "application/gpx+xml",
-      "application/xml",
-      "text/xml",
-      "text/plain",
-      "application/octet-stream",
-      "application/vnd.google-earth.kmz",
-      "",
-    ]) {
-      expect(isRenderedNonGpsContentType(type)).toBe(false);
-    }
   });
 });

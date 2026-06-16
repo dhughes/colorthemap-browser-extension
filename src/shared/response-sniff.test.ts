@@ -36,13 +36,16 @@ describe("classifyResponse", () => {
     ).toBeNull();
   });
 
-  it("rejects a .gpx URL that returns JSON, even with no content-type", async () => {
-    // Any SPA can serve arbitrary bytes at a .gpx-suffixed path; the body
-    // decides. Content-type is often missing (service-worker responses).
+  it("rejects a .gpx URL that returns JSON embedding the file text", async () => {
+    // The real shape GitHub's /_styled endpoint returns: JSON whose string
+    // values quote the raw file ('<gpx …>'). Content-type is often missing
+    // (service-worker responses), so the body must be parsed structurally.
     expect(
       await classifyResponse({
         url: "https://any.example/repo/_styled/master/x/archies_fr.gpx",
-        body: stream('{"payload":{"blob":"…"}}'),
+        body: stream(
+          '{"payload":{"rawLines":["<?xml version=\\"1.0\\"?>","<gpx version=\\"1.1\\"></gpx>"]}}',
+        ),
       }),
     ).toBeNull();
   });

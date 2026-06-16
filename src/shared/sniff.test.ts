@@ -84,6 +84,32 @@ describe("sniffBytes", () => {
     expect(sniffBytes(bytes("<!doctype html><html></html>"), {})).toBeNull();
     expect(sniffBytes(new Uint8Array(0), {})).toBeNull();
   });
+
+  it("does not mistake JSON that embeds GPX text for a GPX file", () => {
+    // The shape GitHub's /_styled endpoint returns: a JSON document whose
+    // string values quote the raw file, including '<gpx …>'.
+    const json =
+      '{"payload":{"rawLines":["<?xml version=\\"1.0\\"?>","<gpx version=\\"1.1\\"></gpx>"]}}';
+    expect(sniffBytes(bytes(json), {})).toBeNull();
+  });
+
+  it("does not mistake an HTML page that mentions gpx for GPX", () => {
+    expect(
+      sniffBytes(
+        bytes("<!doctype html><html><body><code>&lt;gpx&gt;</code>"),
+        {},
+      ),
+    ).toBeNull();
+  });
+
+  it("still recognizes GPX preceded by a comment and whitespace", () => {
+    expect(
+      sniffBytes(
+        bytes('\n  <!-- a route --><?xml version="1.0"?>\n<gpx></gpx>'),
+        {},
+      ),
+    ).toBe("gpx");
+  });
 });
 
 describe("shouldSniffBody", () => {

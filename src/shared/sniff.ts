@@ -31,11 +31,49 @@ function matchesAt(
   return signature.every((byte, i) => bytes[offset + i] === byte);
 }
 
+// Find the document's XML root element the way a parser would: the content must
+// *begin* as XML once a BOM, whitespace, and the prolog (<?…?>, comments,
+// DOCTYPE) are consumed. A substring search would be fooled by markup embedded
+// in another format — e.g. a JSON response that quotes a file's "<gpx …>" text.
 function xmlRootToken(bytes: Uint8Array): string | null {
-  const head = decoder.decode(bytes.subarray(0, XML_HEAD_BYTES));
-  const normalized = head.charCodeAt(0) === 0xfeff ? head.slice(1) : head;
-  const match = normalized.match(/<([A-Za-z_][\w.-]*:)?([A-Za-z_][\w.-]*)/);
-  return match ? (match[2]?.toLowerCase() ?? null) : null;
+  let s = decoder.decode(bytes.subarray(0, XML_HEAD_BYTES));
+  if (s.charCodeAt(0) === 0xfeff) {
+    s = s.slice(1);
+  }
+  let i = 0;
+  while (i < s.length) {
+    const ch = s[i];
+    if (ch === " " || ch === "\t" || ch === "\r" || ch === "\n") {
+      i++;
+      continue;
+    }
+    // First non-whitespace content must be markup, or this isn't XML at all
+    // (e.g. JSON starting with '{' or '[').
+    if (ch !== "<") {
+      return null;
+    }
+    if (s.startsWith("<?", i)) {
+      const end = s.indexOf("?>", i + 2);
+      if (end === -1) return null;
+      i = end + 2;
+      continue;
+    }
+    if (s.startsWith("<!--", i)) {
+      const end = s.indexOf("-->", i + 4);
+      if (end === -1) return null;
+      i = end + 3;
+      continue;
+    }
+    if (s.startsWith("<!", i)) {
+      const end = s.indexOf(">", i + 2);
+      if (end === -1) return null;
+      i = end + 1;
+      continue;
+    }
+    const match = /^<([A-Za-z_][\w.-]*:)?([A-Za-z_][\w.-]*)/.exec(s.slice(i));
+    return match ? (match[2]?.toLowerCase() ?? null) : null;
+  }
+  return null;
 }
 
 function isKmzCorroborated(context: SniffContext): boolean {

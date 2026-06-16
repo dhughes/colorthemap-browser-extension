@@ -21,10 +21,11 @@ console.log(aliveMessage("background"));
 browser.runtime.onInstalled.addListener((details) => {
   console.log(aliveMessage("background"), "onInstalled", details.reason);
   if (details.reason === "install") {
-    // Greet first-time users on the options page with a welcome + Connect CTA.
-    browser.tabs
-      .create({ url: browser.runtime.getURL("options.html?welcome=1") })
-      .catch((err) => console.error("welcome tab failed to open", err));
+    // Greet first-time users on the options page. It shows the welcome +
+    // Connect CTA whenever logged out, so no special parameter is needed.
+    browser.runtime
+      .openOptionsPage()
+      .catch((err) => console.error("could not open options page", err));
   }
 });
 

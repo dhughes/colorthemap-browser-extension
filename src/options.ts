@@ -6,7 +6,6 @@ import {
   type AuthView,
 } from "./ui/authPanel";
 
-const welcome = document.getElementById("welcome")!;
 const loggedOut = document.getElementById("logged-out")!;
 const loggedIn = document.getElementById("logged-in")!;
 const avatar = document.getElementById("avatar") as HTMLImageElement;
@@ -15,14 +14,8 @@ const signup = document.getElementById("signup") as HTMLAnchorElement;
 
 signup.href = CTM_SIGNUP_URL;
 
-// background.ts opens this page with ?welcome=1 on first install.
-const welcomeRequested =
-  new URLSearchParams(location.search).get("welcome") === "1";
-
 function render(view: AuthView): void {
-  // The welcome greeting only makes sense for a freshly installed, not-yet-
-  // connected user — hide it once they're signed in.
-  welcome.hidden = !welcomeRequested || view.authenticated;
+  // Two views: logged-out (welcome + connect) and logged-in (account).
   loggedOut.hidden = view.authenticated;
   loggedIn.hidden = !view.authenticated;
   email.textContent = view.email ?? "";

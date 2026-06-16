@@ -1,0 +1,331 @@
+/* Design tokens — canonical source of truth.
+   Documented at docs/design-system/index.html.
+
+   The foreground/structure family (--color-text, --color-text-muted,
+   --color-text-faint, --color-border, --color-fill, --color-divider,
+   --color-surface-frosted) is surface-scoped, plus --shadow-pill.
+   Default values bind to the on-light surface. Inside anything with
+   class="surface-dark", they re-bind to on-dark variants. Components
+   write var(--color-text) etc. and the value follows the surface they're
+   rendered on. */
+
+:root {
+  /* Brand — magenta. The four alpha variants look similar in isolation
+     but each has a distinct paint role; don't collapse without checking
+     consumers.
+
+     - subtle  (8%):  flat surface tint — chip/option/hover backgrounds
+     - ring    (15%): outlined halo or thin border — focus rings,
+                      2px outlines, focus-ring composition below
+     - shadow  (20%): soft drop shadow underneath brand surfaces —
+                      btn-primary base shadow
+     - glow    (30%): emissive halo or accented stop — geolocate-button
+                      active glow, brand pulse stops */
+  --color-primary: #ff00ff;
+  --color-primary-hover: #cc00cc;
+  --color-primary-subtle: rgba(255, 0, 255, 0.08);
+  --color-primary-ring: rgba(255, 0, 255, 0.15);
+  --color-primary-shadow: rgba(255, 0, 255, 0.2);
+  --color-primary-glow: rgba(255, 0, 255, 0.3);
+
+  /* Surface — light page bg, lifted cream, dark surface.
+     The frosted variant is a surface-scoped role token below
+     (re-binds inside .surface-dark). */
+  --color-bg: #fafaf8;
+  --color-overlay: #fffef9;
+  --color-surface-dark: rgba(26, 26, 26, 0.9);
+
+  /* Foreground, structure & frosted surface — surface-scoped role
+     tokens. Default = on-light values. Re-bound by .surface-dark. */
+  --color-text: #1a1a1a;
+  --color-text-muted: #6b6b6b;
+  --color-text-faint: rgba(26, 26, 26, 0.4);
+  --color-border: #e8e8e6;
+  --color-border-strong: #d0d0ce;
+  --color-fill: rgba(0, 0, 0, 0.04);
+  --color-fill-strong: rgba(0, 0, 0, 0.12);
+  --color-divider: rgba(0, 0, 0, 0.06);
+  --color-surface-frosted: rgba(255, 254, 249, 0.92);
+  --color-surface-pill: rgba(255, 255, 255, 0.9);
+
+  /* Status — success */
+  --color-success: #2d7a3e;
+  --color-success-subtle: rgba(45, 122, 62, 0.08);
+  --color-success-ring: rgba(45, 122, 62, 0.2);
+
+  /* Status — error */
+  --color-error: #c73c3c;
+  --color-error-subtle: rgba(199, 60, 60, 0.08);
+  --color-error-ring: rgba(199, 60, 60, 0.2);
+
+  /* Status — warning */
+  --color-warning: #b8860b;
+  --color-warning-subtle: rgba(184, 134, 11, 0.08);
+  --color-warning-ring: rgba(184, 134, 11, 0.2);
+
+  /* Status — info */
+  --color-info: #2b6a9e;
+  --color-info-subtle: rgba(43, 106, 158, 0.08);
+  --color-info-ring: rgba(43, 106, 158, 0.2);
+
+  /* Destructive button — paint values for the confirm-dialog destructive
+     button. These mirror the brand-shadow pattern from --color-primary-*
+     but tinted in the error color. Not status tokens — using them outside
+     a destructive button context is wrong. */
+  --color-button-destructive-hover: #b33434;
+  --color-button-destructive-shadow: rgba(199, 60, 60, 0.2);
+  --color-button-destructive-shadow-strong: rgba(199, 60, 60, 0.28);
+
+  /* Modal scrim and image-overlay dim */
+  --color-scrim: rgba(26, 26, 26, 0.24);
+  --color-image-overlay: rgba(0, 0, 0, 0.4);
+
+  /* Strava brand (third-party, official #FC4C02) */
+  --color-strava: #fc4c02;
+  --color-strava-subtle: rgba(252, 76, 2, 0.12);
+
+  /* Map domain — user position (Google blue). The -stroke token reads as
+     a literal #ffffff but stays a token so the user-position family
+     (dot, stroke, pulse stops) documents and reads as one coherent group
+     on the design-system page. */
+  --color-user-position: #4285f4;
+  --color-user-position-stroke: #ffffff;
+  --color-user-position-pulse-outer: rgba(66, 133, 244, 0.4);
+  --color-user-position-pulse-mid: rgba(66, 133, 244, 0.1);
+
+  /* Map domain — compass north */
+  --color-compass-north: #e74c3c;
+
+  /* Rail icon — Track Coloring rainbow gradient. Drives the linear
+     gradient stroked on the rail's Palette icon when rainbow
+     coloring mode is active. Treat as a fixed visual ramp, not a
+     reusable palette. */
+  --color-rainbow-stop-1: #ef4444;
+  --color-rainbow-stop-2: #f59e0b;
+  --color-rainbow-stop-3: #10b981;
+  --color-rainbow-stop-4: #3b82f6;
+  --color-rainbow-stop-5: #8b5cf6;
+
+  /* Map domain — full-screen loader overlay (geolocate spinner). */
+  --color-map-loader-overlay: rgba(255, 255, 255, 0.85);
+
+  /* Shadows — elevation tiers. Each step roughly doubles offset/blur for
+     a perceptible jump; don't collapse adjacent tiers without checking
+     intent. --shadow-pill is surface-scoped (heavier on dark surfaces).
+
+     - sm:        flat lift on small chips/badges
+     - md:        modest float for toast-style messaging
+     - lg:        large soft drop for marketing imagery / rail-panel chrome
+     - modal:     stacked: thin border + soft + sharp underneath
+     - pill:      drift shadow for pill-shaped floats (surface-scoped)
+     - popover:   floating menus, tooltips, autocompletes
+     - drawer:    upward-cast for bottom drawer surfaces
+     - hero:      hero/marketing-only large drop (see marketing section) */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.12);
+  --shadow-modal:
+    0 0 0 1px rgba(0, 0, 0, 0.02), 0 12px 40px rgba(0, 0, 0, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-pill: 0 2px 12px rgba(0, 0, 0, 0.12);
+  --shadow-popover:
+    0 8px 32px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-drawer: 0 -4px 20px rgba(0, 0, 0, 0.12);
+  /* Left-docked drawer: elevation cast to the right, toward the page. */
+  --shadow-drawer-left: 8px 0 24px rgba(0, 0, 0, 0.12);
+
+  /* Typography — primitives. Roles documented at docs/design-system/index.html. */
+  --font-sans:
+    "General Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "SF Mono", "Menlo", "Monaco", "Consolas", monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 1.875rem;
+  --text-3xl: 2.25rem;
+  --text-4xl: 3rem;
+  --text-5xl: 3.75rem;
+  /* Marketing display scale — fluid headline sized to viewport width
+     so the hero reads dramatically on desktop and gracefully on
+     mobile. Two tiers establish narrative weight: `--text-display`
+     for first-claim moments (Hero, Hook), `--text-display-sm` one
+     step down for subsequent section claims (Sources, etc.). */
+  --text-display: clamp(2.5rem, 6.5vw, 5rem);
+  --text-display-sm: clamp(2.25rem, 5vw, 4rem);
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --leading-flat: 1;
+  --leading-tight: 1.2;
+  --leading-snug: 1.35;
+  --leading-normal: 1.5;
+
+  --tracking-tighter: -0.04em;
+  --tracking-tight: -0.02em;
+  --tracking-snug: -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;
+
+  /* Spacing — primitives for padding, margin, gap. Rem-based so they
+     scale with browser font-size preference. Use px only for chrome
+     widths and pixel-perfect borders. */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 0.75rem;
+  --space-lg: 1rem;
+  --space-xl: 1.5rem;
+  --space-2xl: 2rem;
+  --space-4xl: 4rem;
+
+  /* Border-radius — primitives. Rem-based for the same reason. */
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.5rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
+  --radius-full: 50%;
+
+  /* Opacity — primitives for state-driven and decorative dimming.
+     Keep animation-only opacity values (in @keyframes) as literals. */
+  --opacity-faint: 0.4;
+  --opacity-muted: 0.6;
+
+  /* Layering — semantic z-index tokens. Use these for any new chrome
+     instead of picking a magic number. Internal stacking values
+     (z-index 0–10 inside a positioned context) stay literal. */
+  --z-chrome: 100;
+  --z-float: 150;
+  --z-popover: 200;
+  --z-modal: 1000;
+  --z-modal-stacked: 1001;
+  --z-toast: 3000;
+  --z-top: 10000;
+
+  /* Motion — transition tokens (composite duration + easing). For
+     keyframe animations, keep the timing literal — each animation has
+     its own intentional curve. */
+  --transition-fast: 0.1s ease;
+  --transition-base: 0.15s ease;
+  --transition-slow: 0.2s ease;
+
+  /* Layout — chrome widths. Stay px since they're sized for icons,
+     not text. */
+  --rail-width: 52px;
+  --panel-width: 350px;
+
+  /* Breakpoints — rem-based for marketing-page responsive design.
+     Note: @media rules cannot read CSS custom properties, so media
+     queries must use literal rem values that match these tokens
+     exactly (e.g. `@media (min-width: 48rem)` for --bp-md). These
+     tokens exist so JS/TS can match the same break points and so
+     docs can reference a single source of truth.
+
+     --bp-mobile-drawer is the app's behavioral breakpoint: below it,
+     panels become bottom drawers. Its JS twin lives in
+     frontend/src/styles/breakpoints.ts (MOBILE_DRAWER_MEDIA_QUERY) so
+     CSS @media rules and the useIsMobile hook can never disagree. Keep
+     the two in sync — scripts/check-color-literals.sh enforces it. */
+  --bp-sm: 30rem;
+  --bp-mobile-drawer: 37.5rem;
+  --bp-md: 48rem;
+  --bp-lg: 64rem;
+  --bp-xl: 80rem;
+
+  /* Container widths — max-widths for the .container family. Marketing
+     content lives inside one of these three widths. */
+  --container-prose: 40rem;
+  --container-standard: 68.75rem;
+  --container-wide: 80rem;
+
+  /* Focus ring — the composed box-shadow used for `:focus-visible` on
+     interactive atoms (links, marketing buttons). Pairs with the
+     primary-ring color for an accessible 3px halo. */
+  --focus-ring: 0 0 0 3px var(--color-primary-ring);
+
+  /* Marketing surfaces — warm/cool/dark band backgrounds and the text
+     colors that sit on dark marketing surfaces. Distinct from the
+     app's --color-bg / --color-surface-dark because marketing pages
+     compose multiple alternating bands within a single page. */
+  --color-bg-warm: #fbf6ec;
+  --color-bg-cool: #f4f6f7;
+  --color-bg-marketing-dark: #1a1a1a;
+
+  /* Marketing shadow — large soft drop used to lift hero imagery and
+     feature cards off the page. Heavier than --shadow-lg because
+     marketing content is meant to feel large. */
+  --shadow-hero:
+    0 30px 80px rgba(0, 0, 0, 0.18), 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* Dark surface — re-binds the foreground/structure family for
+   descendants. Apply via class="surface-dark", or via the existing
+   selectors listed below (which always render on a dark surface).
+
+   Existing app components that own dark surfaces (.road-detail-float,
+   the .pill family, .tooltip and its arrow, .map-location-loader
+   inside dark-mode media) inherit the rebinding via this
+   multi-selector rule — no JSX class changes required.
+
+   Marketing dark section bands (.section-band-dark-neutral,
+   .section-band-dark-brand) compose into the same list so .btn,
+   .alert, .field-label and other foreground consumers all read
+   correctly against the dark background. */
+.surface-dark,
+.road-detail-float,
+.pill,
+.tooltip,
+.tooltip-arrow,
+.section-band-dark-neutral,
+.section-band-dark-brand {
+  --color-text: rgba(255, 255, 255, 0.85);
+  --color-text-muted: rgba(255, 255, 255, 0.55);
+  --color-text-faint: rgba(255, 255, 255, 0.2);
+  --color-border: rgba(255, 255, 255, 0.15);
+  --color-border-strong: rgba(255, 255, 255, 0.25);
+  --color-fill: rgba(255, 255, 255, 0.1);
+  --color-fill-strong: rgba(255, 255, 255, 0.3);
+  --color-divider: rgba(255, 255, 255, 0.06);
+  --color-surface-frosted: rgba(26, 26, 26, 0.9);
+  --shadow-pill: 0 2px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Brand band needs a stronger border than neutral dark — primary
+   actions sit on saturated magenta and a 0.15-alpha border disappears.
+   Bump border + text contrast specifically here. */
+.section-band-dark-brand {
+  --color-text: #fff;
+  --color-border-strong: rgba(255, 255, 255, 0.7);
+}
+
+/* Light surface — re-asserts the on-light defaults for descendants.
+   Use as an "always-light island" inside a dark surface (e.g. a road
+   sign mimic on a white background sitting inside a dark panel). */
+.surface-light {
+  --color-text: #1a1a1a;
+  --color-text-muted: #6b6b6b;
+  --color-text-faint: rgba(26, 26, 26, 0.4);
+  --color-border: #e8e8e6;
+  --color-border-strong: #d0d0ce;
+  --color-fill: rgba(0, 0, 0, 0.04);
+  --color-divider: rgba(0, 0, 0, 0.06);
+  --color-surface-frosted: rgba(255, 254, 249, 0.92);
+  --shadow-pill: 0 2px 12px rgba(0, 0, 0, 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  .map-location-loader {
+    --color-text: rgba(255, 255, 255, 0.85);
+    --color-text-muted: rgba(255, 255, 255, 0.55);
+    --color-text-faint: rgba(255, 255, 255, 0.2);
+    --color-border: rgba(255, 255, 255, 0.15);
+    --color-fill: rgba(255, 255, 255, 0.1);
+    --color-divider: rgba(255, 255, 255, 0.06);
+    --color-surface-frosted: rgba(26, 26, 26, 0.9);
+  }
+}

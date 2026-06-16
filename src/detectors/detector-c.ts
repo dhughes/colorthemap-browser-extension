@@ -12,20 +12,25 @@ function buildBadge(link: HTMLAnchorElement, format: GpsFormat): HTMLElement {
   const host = document.createElement(BADGE_HOST_TAG);
   const shadow = host.attachShadow({ mode: "open" });
 
+  // Mirrors CTM's design-system .btn-primary (magenta brand). Values are
+  // literals, not var(--token)s: this Shadow DOM is injected into arbitrary
+  // third-party pages that don't carry CTM's :root tokens.
   const style = document.createElement("style");
   style.textContent = `
     button {
       all: initial;
       cursor: pointer;
-      font: 600 11px/1.4 system-ui, sans-serif;
+      font: 600 11px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: -0.01em;
       color: #fff;
-      background: #2b7a4b;
-      border-radius: 4px;
-      padding: 2px 6px;
+      background: #ff00ff;
+      border-radius: 8px;
+      padding: 3px 8px;
       margin-inline-start: 6px;
       vertical-align: middle;
+      box-shadow: 0 2px 8px rgba(255, 0, 255, 0.2);
     }
-    button:hover { background: #225f3b; }
+    button:hover { background: #cc00cc; }
   `;
 
   const button = document.createElement("button");

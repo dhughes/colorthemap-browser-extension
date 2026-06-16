@@ -1,8 +1,4 @@
-import {
-  AUTH_MESSAGE_TYPES,
-  isAuthMessage,
-  type AuthState,
-} from "./messages";
+import { AUTH_MESSAGE_TYPES, isAuthMessage, type AuthState } from "./messages";
 import { getAuthState, logout, startAuthFlow } from "./service";
 
 // Routes a runtime message to the matching auth action. Returns a Promise the

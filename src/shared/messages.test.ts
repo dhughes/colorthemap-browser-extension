@@ -1,13 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   DETECTION_MESSAGE_TYPE,
-  SKIP_MESSAGE_TYPE,
   createDetectionMessage,
-  createSkipMessage,
   formatDetectionLog,
-  formatSkipLog,
   isDetectionMessage,
-  isSkipMessage,
   type DetectionPayload,
 } from "./messages";
 
@@ -105,60 +101,5 @@ describe("formatDetectionLog", () => {
     ).toBe(
       "[detector:A] would send https://example.com/tour.kmz to CTM (kmz, source=fetch)",
     );
-  });
-});
-
-describe("skip messages", () => {
-  const skipPayload = {
-    detector: "C" as const,
-    url: "https://github.com/o/r/blob/master/x/archies_fr.gpx",
-    reason: "linked resource is not GPS data",
-  };
-
-  it("stamps the skip discriminant and preserves the payload", () => {
-    expect(createSkipMessage(skipPayload)).toEqual({
-      type: SKIP_MESSAGE_TYPE,
-      detector: "C",
-      url: skipPayload.url,
-      reason: skipPayload.reason,
-    });
-  });
-
-  it("omits the reason when none is given", () => {
-    const message = createSkipMessage({
-      detector: "B",
-      url: "https://x/y.gpx",
-    });
-    expect(message.reason).toBeUndefined();
-  });
-
-  it("recognizes a well-formed skip message and rejects others", () => {
-    expect(isSkipMessage(createSkipMessage(skipPayload))).toBe(true);
-    expect(isSkipMessage(createDetectionMessage(validPayload))).toBe(false);
-    expect(
-      isSkipMessage({ type: SKIP_MESSAGE_TYPE, detector: "Z", url: "x" }),
-    ).toBe(false);
-    expect(isSkipMessage({ type: SKIP_MESSAGE_TYPE, detector: "C" })).toBe(
-      false,
-    );
-    expect(isSkipMessage(null)).toBe(false);
-  });
-
-  it("does not confuse send and skip messages", () => {
-    expect(isDetectionMessage(createSkipMessage(skipPayload))).toBe(false);
-  });
-
-  it("renders the 'would NOT send' log line", () => {
-    expect(formatSkipLog(createSkipMessage(skipPayload))).toBe(
-      `[detector:C] would NOT send ${skipPayload.url} to CTM (linked resource is not GPS data)`,
-    );
-  });
-
-  it("renders without a parenthetical when there is no reason", () => {
-    expect(
-      formatSkipLog(
-        createSkipMessage({ detector: "C", url: "https://x/y.gpx" }),
-      ),
-    ).toBe("[detector:C] would NOT send https://x/y.gpx to CTM");
   });
 });

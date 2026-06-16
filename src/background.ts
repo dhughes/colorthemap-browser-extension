@@ -1,13 +1,11 @@
 import browser from "webextension-polyfill";
 import { aliveMessage } from "./shared/alive";
-import { onDetection, onSkip } from "./shared/bus";
+import { onDetection } from "./shared/bus";
 import { createRecentDetections } from "./shared/dedupe";
 import {
   createDetectionMessage,
   formatDetectionLog,
-  formatSkipLog,
   type DetectionMessage,
-  type SkipMessage,
 } from "./shared/messages";
 import { initDetectorB } from "./detectors/detector-b";
 
@@ -22,12 +20,7 @@ function handleDetection(message: DetectionMessage): void {
   console.log(formatDetectionLog(message));
 }
 
-function handleSkip(message: SkipMessage): void {
-  console.log(formatSkipLog(message));
-}
-
 onDetection(handleDetection);
-onSkip(handleSkip);
 initDetectorB((payload) => handleDetection(createDetectionMessage(payload)));
 
 browser.runtime.onInstalled.addListener((details) => {

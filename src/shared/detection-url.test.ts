@@ -66,6 +66,24 @@ describe("filenameFromContentDisposition", () => {
     ).toBe("My Ride.gpx");
   });
 
+  it("reads a quoted filename containing spaces", () => {
+    expect(
+      filenameFromContentDisposition('attachment; filename="My Ride.gpx"'),
+    ).toBe("My Ride.gpx");
+  });
+
+  it("handles an extended filename* lacking the charset'lang' prefix", () => {
+    expect(
+      filenameFromContentDisposition("attachment; filename*=route.gpx"),
+    ).toBe("route.gpx");
+  });
+
+  it("falls back to the raw value when percent-decoding fails", () => {
+    expect(
+      filenameFromContentDisposition("attachment; filename*=UTF-8''bad%ZZ.gpx"),
+    ).toBe("bad%ZZ.gpx");
+  });
+
   it("returns null when no filename is present", () => {
     expect(filenameFromContentDisposition("inline")).toBeNull();
     expect(filenameFromContentDisposition("")).toBeNull();

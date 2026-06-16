@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  filenameFromContentDisposition,
   formatForFilename,
   formatForUrl,
   isAmbiguousDownloadUrl,
@@ -41,6 +42,33 @@ describe("formatForUrl", () => {
     expect(formatForUrl("https://example.com/")).toBeNull();
     expect(formatForUrl("not a url")).toBeNull();
     expect(formatForUrl("")).toBeNull();
+  });
+});
+
+describe("filenameFromContentDisposition", () => {
+  it("reads a quoted filename", () => {
+    expect(
+      filenameFromContentDisposition('attachment; filename="route.gpx"'),
+    ).toBe("route.gpx");
+  });
+
+  it("reads an unquoted filename", () => {
+    expect(
+      filenameFromContentDisposition("attachment; filename=route.gpx"),
+    ).toBe("route.gpx");
+  });
+
+  it("prefers the extended filename* over filename (RFC 6266) and decodes it", () => {
+    expect(
+      filenameFromContentDisposition(
+        "attachment; filename=\"route.fit\"; filename*=UTF-8''My%20Ride.gpx",
+      ),
+    ).toBe("My Ride.gpx");
+  });
+
+  it("returns null when no filename is present", () => {
+    expect(filenameFromContentDisposition("inline")).toBeNull();
+    expect(filenameFromContentDisposition("")).toBeNull();
   });
 });
 

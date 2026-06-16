@@ -57,6 +57,7 @@ function wrapFetch(): void {
 
 interface TaggedXhr extends XMLHttpRequest {
   __ctmUrl?: string;
+  __ctmHooked?: boolean;
 }
 
 function wrapXhr(): void {
@@ -71,9 +72,15 @@ function wrapXhr(): void {
   } as typeof proto.open;
 
   proto.send = function (this: TaggedXhr) {
-    this.addEventListener("load", () => {
-      void inspectXhr(this);
-    });
+    // Attach the load listener once per instance. XHR objects are reused
+    // (open/send repeatedly); a single persistent listener fires once per
+    // completed request, whereas adding one per send() would stack them.
+    if (!this.__ctmHooked) {
+      this.__ctmHooked = true;
+      this.addEventListener("load", () => {
+        void inspectXhr(this);
+      });
+    }
     // eslint-disable-next-line prefer-rest-params
     return originalSend.apply(this, arguments as never);
   } as typeof proto.send;

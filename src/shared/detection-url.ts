@@ -35,10 +35,21 @@ export function formatForFilename(filename: string): GpsFormat | null {
 export function filenameFromContentDisposition(
   contentDisposition: string,
 ): string | null {
-  const match = contentDisposition.match(
-    /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i,
+  // RFC 6266: when both are present, the extended `filename*` (percent-encoded,
+  // charset-prefixed) takes precedence over the plain `filename`.
+  const extended = contentDisposition.match(
+    /filename\*=(?:[\w-]+'[^']*')?([^";]+)/i,
   );
-  return match?.[1]?.trim() ?? null;
+  if (extended?.[1]) {
+    const value = extended[1].trim();
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+  const plain = contentDisposition.match(/filename="?([^";]+)"?/i);
+  return plain?.[1]?.trim() ?? null;
 }
 
 const DOWNLOAD_HINT_PARAMS = ["format", "token", "export", "dl", "download"];

@@ -1,7 +1,8 @@
-import { sendDetection } from "../shared/bus";
+import { sendDetection, sendSkip } from "../shared/bus";
 import { formatForUrl } from "../shared/detection-url";
 import { getFormatSpec, type GpsFormat } from "../shared/formats";
 import { isDetectionEnabledForHost } from "../shared/gate";
+import { classifyResponse } from "../shared/response-sniff";
 
 const BADGE_HOST_TAG = "ctm-import-badge";
 
@@ -34,12 +35,7 @@ function buildBadge(link: HTMLAnchorElement, format: GpsFormat): HTMLElement {
   button.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    void sendDetection({
-      detector: "C",
-      format,
-      source: "link",
-      url: link.href,
-    });
+    void verifyAndReport(link.href);
   });
 
   shadow.append(style, button);
@@ -56,6 +52,39 @@ function evaluateLink(link: HTMLAnchorElement): void {
   }
   badged.add(link);
   link.insertAdjacentElement("afterend", buildBadge(link, format));
+}
+
+// The link's extension only tells us what it *looks* like. A URL ending in
+// .gpx can resolve to an HTML page (e.g. GitHub's /blob view), so confirm the
+// linked resource is really GPS data before claiming we'd send it. Same-origin
+// links verify today; cross-origin ones need host permissions (upload work),
+// and fail closed to "could not verify" until then.
+async function verifyAndReport(url: string): Promise<void> {
+  try {
+    const response = await fetch(url);
+    const format = await classifyResponse({
+      url,
+      contentType: response.headers.get("content-type") ?? undefined,
+      contentDisposition:
+        response.headers.get("content-disposition") ?? undefined,
+      body: response.body,
+    });
+    if (format) {
+      void sendDetection({ detector: "C", format, source: "link", url });
+    } else {
+      void sendSkip({
+        detector: "C",
+        url,
+        reason: "linked resource is not GPS data",
+      });
+    }
+  } catch {
+    void sendSkip({
+      detector: "C",
+      url,
+      reason: "could not verify linked resource",
+    });
+  }
 }
 
 function scan(root: ParentNode): void {

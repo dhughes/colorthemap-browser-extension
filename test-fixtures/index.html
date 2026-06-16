@@ -86,32 +86,45 @@
     </section>
 
     <section>
-      <h2>Detector A — verify on real sites (not here)</h2>
+      <h2>Detector A — same-origin fetch / XHR (works locally)</h2>
       <p>
-        Detector A wraps the <em>page’s own</em> <code>fetch</code>/XHR, and
-        cross-origin requests from this local page are blocked by CORS before
-        the wrap sees a usable response. So Detector A must be exercised on the
-        real sites whose same-origin export calls it is designed to catch:
+        Detector A wraps the page’s own <code>fetch</code>/XHR. These calls are
+        same-origin (this page → its own server), so the wrap sees them — no
+        CORS issue. Each logs <code>[detector:A] …</code> and does not save a
+        file, so Detector B stays quiet.
       </p>
       <ul>
         <li>
-          <strong>Komoot</strong> — open a tour, click <em>Export GPX</em>.
-          Expect <code>[detector:A] … source=fetch</code> after the response
-          completes (POST → bytes, no <code>.gpx</code> in the URL).
+          <button data-fetch="./files/sample.gpx">fetch GPX (URL has extension)</button>
+          → <code>source=fetch</code>, classified by the URL.
         </li>
         <li>
-          <strong>Strava</strong> — an activity’s <em>Export GPX</em>
-          (<code>/activities/&lt;id&gt;/export_gpx</code>, no extension in the
-          path — exercises content-type / content-disposition sniffing).
+          <button data-xhr="./files/sample.tcx">XHR TCX</button>
+          → <code>source=xhr</code>.
         </li>
         <li>
-          <strong>Garmin Connect / AllTrails / Ride with GPS</strong> — any
-          in-page GPX/TCX/KML export button.
+          <button data-fetch="./files/gpx-export-endpoint?token=abc">fetch GPX, no extension</button>
+          → <code>source=fetch</code>, forced down the <em>body-sniff</em> path
+          (ambiguous URL → XML-root sniff).
         </li>
         <li>
-          At least one site that exports via <code>XMLHttpRequest</code> rather
-          than <code>fetch</code> → expect <code>source=xhr</code>.
+          <button data-fetch="./files/fit-export-endpoint?token=abc">fetch FIT (binary), no extension</button>
+          → <code>source=fetch</code>, binary body-sniff (the <code>.FIT</code>
+          marker at offset 8).
         </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Detector A — real-site sanity check (optional)</h2>
+      <p>
+        The local buttons above cover the mechanism. For real-world shapes the
+        local static server can’t reproduce (POST → bytes, custom content-types),
+        spot-check a real export:
+      </p>
+      <ul>
+        <li><strong>Komoot</strong> — open a tour → <em>Export GPX</em> → expect <code>source=fetch</code>.</li>
+        <li><strong>Strava</strong> — an activity’s <em>Export GPX</em> (<code>/activities/&lt;id&gt;/export_gpx</code>).</li>
       </ul>
     </section>
 
@@ -122,6 +135,20 @@
         a.textContent = "dynamically-added sample.kml";
         document.getElementById("dynamic-target").append(a);
       });
+
+      for (const button of document.querySelectorAll("[data-fetch]")) {
+        button.addEventListener("click", async () => {
+          await fetch(button.getAttribute("data-fetch"));
+        });
+      }
+
+      for (const button of document.querySelectorAll("[data-xhr]")) {
+        button.addEventListener("click", () => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("GET", button.getAttribute("data-xhr"));
+          xhr.send();
+        });
+      }
     </script>
   </body>
 </html>

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<notes>
+  <note>This is valid XML, but its root is &lt;notes&gt;, not TrainingCenterDatabase.</note>
+</notes>

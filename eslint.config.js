@@ -23,6 +23,12 @@ export default defineConfig([
         ...globals.serviceworker,
       },
     },
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+    },
   },
   {
     files: ["vite.config.ts", "vitest.config.ts"],

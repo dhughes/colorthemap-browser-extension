@@ -6,8 +6,6 @@ Guidance for Claude Code when working in this repo. Sibling to (and modeled on) 
 
 **CRITICAL:** When you need to ask the user a question, ALWAYS use the `AskUserQuestion` tool instead of embedding the question in a long response. Use it multiple times if you have multiple questions. Buried questions are easy to miss.
 
-**CRITICAL:** NEVER push to GitHub without explicit user permission. Always ask first, even when it seems obvious.
-
 ## Code Quality
 
 **Leave the code in a better place than you found it.** Boy scout rule, every change.

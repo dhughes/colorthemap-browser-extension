@@ -6,7 +6,7 @@ Phase 1 plan: [issue #1](https://github.com/dhughes/colorthemap-browser-extensio
 
 ## Status
 
-This branch is the **project scaffold only** — Manifest V3 shell, build pipeline, and a marker that proves each surface loads. No detection, auth, or upload yet; those land in follow-up issues.
+In progress. Landed so far: the MV3 shell + build pipeline, the GPS **detection** framework ([#4](https://github.com/dhughes/colorthemap-browser-extension/issues/4), logging only), and **Color The Map authentication** ([#10](https://github.com/dhughes/colorthemap-browser-extension/issues/10), OAuth Authorization Code + PKCE). Still to come: streaming upload to CTM, per-site settings, and Safari.
 
 ## Stack
 
@@ -20,19 +20,19 @@ This branch is the **project scaffold only** — Manifest V3 shell, build pipeli
 
 ```
 src/
-  background.ts     # MV3 service worker (module)
+  background.ts     # MV3 service worker (module): auth flow, detection log, alarms
   content.ts        # content script injected on <all_urls>
-  popup.html        # browser action popup
-  popup.ts
-  options.html      # options page (open_in_tab)
+  options.html      # options page (open_in_tab) — the single UI hub
   options.ts
-  shared/
-    alive.ts        # the "I am loaded" marker each surface logs
-    alive.test.ts   # sample Vitest test
+  auth/             # OAuth: pkce, api, storage, service, alarms, errors, messages
+  detectors/        # GPS-download detectors A/B/C (#4)
+  ui/               # shared options/popup-surface helpers (authPanel)
+  shared/           # formats, sniffing, dedupe, detection bus, alive marker
+  styles/           # vendored CTM design system (see styles/README.md)
 manifest.base.json  # source of truth, transformed per-browser at build time
-vite.config.ts      # vite-plugin-web-extension build (per-browser, all four surfaces)
+vite.config.ts      # vite-plugin-web-extension build (per-browser)
 vitest.config.ts    # unit test config
-public/             # static assets copied as-is into each dist (icons go here)
+public/             # static assets copied as-is into each dist (icons, fonts, logo)
 ```
 
 ## Dev
@@ -62,7 +62,7 @@ Build first so `dist/` exists:
 npm run build
 ```
 
-This scaffold's only behaviour is to log `[CTM Importer scaffold alive] <surface>` in the relevant console for each of the four surfaces. Where to look for that message is called out in each section below.
+Each surface still logs `[CTM Importer scaffold alive] <surface>` on load (background, content, options). Where to look for that message — and the other DevTools entry points — is called out in each section below.
 
 #### Chrome
 
@@ -76,8 +76,8 @@ Where to see the alive markers:
 
 - **Background (service worker)**: on the extension card, click **service worker** (or **Inspect views: service worker**). A DevTools window opens — the marker is in its Console.
 - **Content script**: open any HTTP/HTTPS page, open DevTools (⌥⌘I), Console tab.
-- **Popup**: click the toolbar icon to open the popup. Right-click inside the popup → **Inspect** to open its DevTools.
-- **Options**: on the extension card, click **Details** → **Extension options**. Open DevTools (⌥⌘I) on the resulting tab.
+- **Toolbar button**: clicking the toolbar icon opens the settings/options page (there is no popup). Confirm the ID shows as `jofhleeceicfjcdphnbbnhiolcddcopi` (pinned dev key).
+- **Options**: the toolbar button, or the extension card's **Details** → **Extension options**. Open DevTools (⌥⌘I) on the resulting tab.
 
 To pick up code changes, re-run `npm run build` and click the **reload** (↻) button on the extension card.
 
@@ -98,8 +98,8 @@ Where to see the alive markers:
 
 - **Background (service worker)**: on the extension's row, click **Inspect**. A DevTools window opens — marker is in its Console.
 - **Content script**: open any HTTP/HTTPS page, open DevTools (⌥⌘I), Console tab.
-- **Popup**: click the toolbar icon. To inspect, in `about:debugging` click **Inspect** on the row, then use its Multiprocess Toolbox — or simpler, right-click inside the popup → **Inspect**.
-- **Options**: open `about:addons` → find the extension → **Preferences** (the options page opens in a tab). Use that tab's DevTools.
+- **Toolbar button**: clicking the toolbar icon opens the settings/options page (there is no popup).
+- **Options**: the toolbar button, or `about:addons` → find the extension → **Preferences** (opens the options page in a tab). Use that tab's DevTools.
 
 After a code change: `npm run build`, then in `about:debugging` click **Reload** on the extension's row.
 
@@ -107,14 +107,40 @@ After a code change: `npm run build`, then in `about:debugging` click **Reload**
 
 Deferred — see [issue #5](https://github.com/dhughes/colorthemap-browser-extension/issues/5). Safari needs Xcode, the `safari-web-extension-converter` tool, and (for distribution) Apple Developer enrollment, which together added more complexity than the scaffold milestone warranted. The architecture is Safari-friendly (single manifest source, no Safari-specific assumptions in src/), so adding it back should be additive when #5 is picked up.
 
+## Authentication
+
+The extension authenticates against Color The Map using OAuth Authorization
+Code + PKCE ([#10](https://github.com/dhughes/colorthemap-browser-extension/issues/10)).
+Clicking **Connect** opens CTM's `/oauth/authorize` page via
+`chrome.identity.launchWebAuthFlow`; after sign-in the extension exchanges the
+code at `/oauth/token` and stores the tokens in the background service worker
+(silent, proactive refresh; single account at a time). The target CTM origin is
+selected at build time via the `VITE_CTM_BASE_URL` env var — it **defaults to
+`https://dev.colorthemap.app`**; set `VITE_CTM_BASE_URL=https://colorthemap.app`
+for a production build.
+
+### Deploy coordination (required before auth works) ⚠️
+
+CTM validates the extension's redirect URI against its
+`OAUTH_EXTENSION_REDIRECT_URIS` env var (see
+[color-the-map#867](https://github.com/dhughes/color-the-map/pull/867)). Each
+target environment must include this extension's redirect URIs **before**
+Connect will succeed there:
+
+- **Chrome / Edge (dev, pinned key):** `https://jofhleeceicfjcdphnbbnhiolcddcopi.chromiumapp.org/*`
+- **Firefox (dev + prod, from `gecko.id`):** `https://a241358d0f3749a5b1e4d44ec3c8a1d37329597b.extensions.allizom.org/*`
+- **Chrome / Edge (prod):** the store-assigned IDs' `*.chromiumapp.org/*`, added at publish time.
+
+The CTM **dev** environment needs the dev URIs; the CTM **prod** environment
+needs prod + dev (so a real unpacked extension can be tested against prod).
+
 ## What's next
 
 Each of these will be a separate issue + branch:
 
-- [#4](https://github.com/dhughes/colorthemap-browser-extension/issues/4) — GPS detection framework (three-detector pipeline, logging only)
 - [#5](https://github.com/dhughes/colorthemap-browser-extension/issues/5) — Add Safari support
-- Color The Map authentication flow
 - Streaming upload to the CTM tusd endpoint
+- Detector "sign in to send" affordance when logged out (wires the badge/toast to the auth flow)
 - Per-domain settings and toast UI
-- Real icons and store listing assets
-- CI/CD: tests + builds on PR/merge, marketplace auto-deploy where feasible
+- Real store listing assets
+- CI/CD: marketplace auto-deploy where feasible

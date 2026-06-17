@@ -1,0 +1,2045 @@
+/* Shared component classes — atoms and patterns the app, public site, and
+   docs page all use. Reached through design-system.css, which is the
+   canonical DS entry point. Documented at docs/design-system/index.html. */
+
+/* Honor the user's "reduce motion" OS preference. Collapses keyframe
+   animations and CSS transitions to near-zero across the entire app,
+   regardless of the duration tokens. Scroll smoothing also disabled.
+   `!important` is correct here — this is the standard escape hatch
+   recognized by the OS-level accessibility setting and must beat any
+   per-rule duration. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Visually-hidden text that screen readers still announce. The standard
+   pattern: take the element out of visual flow with absolute positioning
+   + 1×1 clipped box, but leave it in the accessibility tree. Use for
+   labels that are visually redundant (a label conveyed by surrounding
+   context to sighted users but needed by assistive tech). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────
+   The base .btn IS the secondary look — bordered, transparent, muted —
+   because that's the neutral default a button should fall back to.
+   Variants override on top to add emphasis (primary, destructive) or
+   change shape (icon).
+
+   Compose: `.btn` alone for secondary; `.btn .btn-primary` / `.btn
+   .btn-destructive` / `.btn .btn-destructive-secondary` / `.btn .btn-icon`
+   for variants. Sizes (.btn-sm / .btn-lg) and width (.btn-block) are
+   compound modifiers on top of any of the above.
+
+   Specialized buttons that aren't part of this vocabulary
+   (.ta-toolbar-btn, .activity-rail-btn) keep their own styling — they
+   serve very specific roles in fixed contexts. */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-snug);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.btn:hover:not(:disabled):not(.disabled) {
+  background: var(--color-bg);
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.btn:disabled,
+.btn.disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-muted);
+}
+
+/* Uniform keyboard-focus ring for every focusable (mouse clicks don't
+   trigger :focus-visible). Elements with a deliberate custom focus
+   treatment (form inputs' shadow, .link, .nav-link, public-site rings,
+   the ModalShell container's suppression) override this via their own
+   more-specific :focus/:focus-visible rules. Without this, anything
+   unstyled falls through to the browser-default blue ring. */
+:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+.btn-sm {
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-sm);
+}
+
+.btn-lg {
+  font-size: var(--text-lg);
+}
+
+.btn-block {
+  display: flex;
+  width: 100%;
+}
+
+/* Primary — solid magenta, white text, drop shadow. */
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+  border-color: transparent;
+  font-weight: var(--font-weight-semibold);
+  box-shadow: 0 2px 8px var(--color-primary-shadow);
+}
+
+.btn-primary:hover:not(:disabled):not(.disabled) {
+  background: var(--color-primary-hover);
+  border-color: transparent;
+  color: white;
+  box-shadow: 0 2px 8px rgba(255, 0, 255, 0.28);
+}
+
+.btn-primary:active:not(:disabled):not(.disabled) {
+  box-shadow: 0 1px 3px var(--color-primary-shadow);
+}
+
+/* Destructive — solid error, white text, drop shadow.
+   Use for confirm dialogs where the action is the primary CTA. */
+.btn-destructive {
+  background: var(--color-error);
+  color: white;
+  border-color: transparent;
+  font-weight: var(--font-weight-semibold);
+  box-shadow: 0 2px 8px var(--color-button-destructive-shadow);
+}
+
+.btn-destructive:hover:not(:disabled):not(.disabled) {
+  background: var(--color-button-destructive-hover);
+  border-color: transparent;
+  color: white;
+  box-shadow: 0 2px 8px var(--color-button-destructive-shadow-strong);
+}
+
+.btn-destructive:active:not(:disabled):not(.disabled) {
+  box-shadow: 0 1px 3px var(--color-button-destructive-shadow);
+}
+
+/* Primary outline — magenta border + text, transparent bg.
+   Use when the primary action is contextual and shouldn't shout
+   (the "Change photo" affordance next to an avatar, etc.). */
+.btn-primary-outline {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.btn-primary-outline:hover:not(:disabled):not(.disabled) {
+  background: var(--color-primary-subtle);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* Destructive outline — red border + text, transparent bg.
+   Use for inline destructive actions in panels (delete a token,
+   disconnect a service, delete a track). Always reads as destructive
+   at rest, not just on hover. */
+.btn-destructive-secondary {
+  color: var(--color-error);
+  border-color: var(--color-error);
+}
+
+.btn-destructive-secondary:hover:not(:disabled):not(.disabled) {
+  background: var(--color-error-subtle);
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+/* Text-style — same `.btn` box (padding, font-size, font-weight, line
+   height) so it aligns with sibling buttons in an action row, but with
+   no visible border and a link-style color treatment. Use for buttons
+   that need to take button space but read as text — e.g. a "Sign in"
+   trigger sitting next to a primary CTA in a header. Distinct from
+   `.text-button` (which is the inline reset for prose-context buttons
+   like the IntegrationsPanel "Change" link). */
+.btn-text {
+  color: var(--color-text);
+  border-color: transparent;
+}
+
+.btn-text:hover:not(:disabled):not(.disabled) {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-primary);
+}
+
+/* Inline link-style button — used inside prose ("Sign up", "Sign in" links
+   inside the auth modals' switch lines). Mimics an <a> visually while
+   keeping the underlying element a real <button> for accessibility and the
+   project's button-type rule. */
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-primary);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  color: var(--color-primary-hover);
+}
+
+/* Icon-only — square, transparent bg, no border, just an icon.
+   Use for modal close buttons. The activity-rail and panel-header
+   icon buttons have their own scale-hover patterns and stay separate. */
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-color: transparent;
+}
+
+.btn-icon:hover:not(:disabled):not(.disabled) {
+  background: var(--color-bg);
+  border-color: transparent;
+  color: var(--color-text);
+}
+
+/* Alias — .btn alone is already the secondary look (bordered, transparent,
+   muted). This empty rule exists so callers can write the explicit
+   className="btn btn-secondary" pattern that reads more clearly alongside
+   .btn-primary etc. */
+.btn-secondary {
+  /* inherits everything from .btn */
+}
+
+/* ── Dividers ────────────────────────────────────────────────────────────
+   The design system uses `border-top` on adjacent siblings (via the `+`
+   combinator on a section-wrapper class) for horizontal section breaks
+   inside a panel/modal body. This avoids inserting `<hr>` elements
+   between siblings and matches the convention already used for
+   structural chrome (modal headers, panel toolbars, list-item rows).
+
+   For vertical separators between flex children (e.g. button groups in
+   the target-area toolbar), use `.divider-vertical` — a vertical 1px
+   line as a sibling element, since `border-left` on flex children
+   would shift their layout. */
+
+.divider-vertical {
+  border: none;
+  width: 1px;
+  align-self: stretch;
+  background: var(--color-border);
+  margin: 0 var(--space-sm);
+  flex-shrink: 0;
+}
+
+/* Menu popover groups — wrap each conceptual group of menu items in
+   `<div class="menu-popover-group" role="group">`. Border is drawn
+   between groups via the adjacent-sibling combinator. */
+.menu-popover-group + .menu-popover-group {
+  margin-top: var(--space-xs);
+  padding-top: var(--space-xs);
+  border-top: 1px solid var(--color-border);
+}
+
+/* Panel section — the canonical section wrapper for grouped content
+   inside panels and modal bodies. Apply alongside any bespoke layout
+   class; the bespoke class owns padding/layout, this class owns the
+   divider above each non-first sibling. Documented at
+   docs/design-system/index.html. */
+.panel-section + .panel-section {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-border);
+}
+
+/* ── Alerts ──────────────────────────────────────────────────────────────
+   Inline status banners. Same layout for all severities — subtle tinted
+   bg, colored ring, colored text — differing only in the color family
+   pulled in by the modifier. Used for form errors, inline warnings, and
+   success confirmations.
+
+   Animation timing on .alert (and on .modal-backdrop / .modal-card /
+   .pill below) is intentionally literal: --transition-* tokens are for
+   the `transition:` shorthand only. Each @keyframes block tunes its own
+   duration and easing curve as a unit, and tokens.css documents that
+   convention. */
+
+.alert {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-md);
+  border: 1px solid;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-lg);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.alert-error {
+  background: var(--color-error-subtle);
+  border-color: var(--color-error-ring);
+  color: var(--color-error);
+}
+
+.alert-warning {
+  background: var(--color-warning-subtle);
+  border-color: var(--color-warning-ring);
+  color: var(--color-warning);
+  font-weight: var(--font-weight-medium);
+}
+
+.alert-success {
+  background: var(--color-success-subtle);
+  border-color: var(--color-success-ring);
+  color: var(--color-success);
+}
+
+.alert-info {
+  background: var(--color-info-subtle);
+  border-color: var(--color-info-ring);
+  color: var(--color-info);
+}
+
+/* ── Pills ───────────────────────────────────────────────────────────────
+   Floating frosted pill — a small label that hovers over the map (track
+   count, dev-environment marker, zoom readout, etc.). `.pill` is listed
+   in the surface-dark multi-selector in tokens.css, which re-binds the
+   foreground role tokens — so `--color-text` is already the on-dark
+   value here. We still write `color: #fff` literally rather than
+   `var(--color-text)` because the on-dark text token is 85% white
+   (the muted reading color); the pill wants the brightest legible
+   white against its frosted-dark surface. */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-regular);
+  color: #fff;
+  background: var(--color-surface-frosted);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pill);
+  white-space: nowrap;
+  animation: pillEnter 0.2s ease-out;
+}
+
+@keyframes pillEnter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Spinner ─────────────────────────────────────────────────────────────
+   Bordered-circle loading spinner. Uses `currentColor` so the active arc
+   inherits the parent's text color: white text in a primary button →
+   white spinner; muted-text "Saving…" label → muted spinner. The track
+   (the rest of the ring) is a 25%-opaque version of the same color.
+
+   Compose: `.spinner` alone for the default 16px; `.spinner .spinner-sm`
+   for compact contexts; `.spinner .spinner-lg` for prominent loading
+   states (centered button overlays, etc.). */
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-top-color: currentColor;
+  border-radius: var(--radius-full);
+  animation: spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+
+.spinner-sm {
+  width: 12px;
+  height: 12px;
+  border-width: 1.5px;
+}
+
+.spinner-lg {
+  width: 20px;
+  height: 20px;
+  animation-duration: 0.8s;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Dot ────────────────────────────────────────────────────────────────
+   Small 8px circle used as a status indicator. The base `.dot` has no
+   color — modifiers paint the fill. Use anywhere a colored dot needs
+   to read as a state (uptime badge, "live" indicator, severity marker
+   in a list header).
+
+   Compose: `.dot` alone for a muted-text dot · add `.dot-success` /
+   `.dot-error` / `.dot-warning` / `.dot-muted` to recolor. Wrap with a
+   consumer-specific class for animation (pulse, etc.) when needed. */
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-text-muted);
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.dot-success {
+  background: var(--color-success);
+}
+.dot-error {
+  background: var(--color-error);
+}
+.dot-warning {
+  background: var(--color-warning);
+}
+.dot-muted {
+  background: var(--color-text-muted);
+}
+
+/* ── Layout atoms ───────────────────────────────────────────────────────
+   Small reusable flex shapes. Compose with consumer-local rules for
+   padding/margin/gap overrides where context demands it. */
+
+/* Action row — trailing button group. Flex, end-aligned, small gap.
+   Used at the bottom of modal/dialog bodies (confirm dialogs, settings
+   forms). Consumers add their own padding/margin/gap where the local
+   shape demands it. */
+.action-row {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+}
+
+/* Tabs — horizontal nav strip with a 2px underline on the active item.
+   The container draws the baseline 1px border that the active tab's
+   underline overlaps. The 1px negative margin-bottom on `.tab` lets
+   its underline sit flush with the container's baseline border.
+
+   Compose: `.tabs` on the strip · `.tab` on each item · `.tab.active`
+   on the selected item. Marketing nav and segmented controls can reuse
+   the same shape — the atom doesn't care whether one is "selected" or
+   "active". Consumer-local layout (padding, sticky offsets, etc.) lives
+   on its own wrapper class alongside `.tabs`. */
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+  gap: 0;
+}
+
+.tab {
+  padding: var(--space-md) var(--space-lg);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  letter-spacing: var(--tracking-snug);
+  margin-bottom: -1px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  color: var(--color-text);
+}
+
+.tab.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+/* ── Tooltip ────────────────────────────────────────────────────────────
+   Rich tooltip floated next to a trigger (icon button, etc.). Always
+   renders on a dark surface — the surface-dark multi-selector in
+   tokens.css rebinds descendant foreground/structure tokens to their
+   on-dark variants.
+
+   Compose: `.tooltip` on the bubble · `.tooltip-below` /
+   `.tooltip-above` / `.tooltip-right` for placement · `.tooltip-arrow`
+   on the pointer · `.tooltip-title` / `.tooltip-description` /
+   `.tooltip-note` for the content roles. Trigger wrapper handles
+   positioning context (relative). */
+
+.tooltip {
+  /* Fixed positioning + portal mount lets the tooltip escape its parent's
+     stacking context (e.g. the activity rail and progress bar both sit at
+     z-index var(--z-chrome); without the portal a tooltip anchored to a
+     rail icon paints under the progress bar). Consumers compute the
+     top/left via getBoundingClientRect and pass them as inline style. */
+  position: fixed;
+  z-index: var(--z-top);
+  width: 220px;
+  padding: var(--space-md) var(--space-md);
+  background: var(--color-surface-dark);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  box-shadow:
+    var(--shadow-popover),
+    0 0 0 1px var(--color-divider);
+  pointer-events: auto;
+  animation: tooltipFadeIn 0.15s ease-out;
+}
+
+/* Variants control the entrance animation and arrow position. Body
+   positioning is supplied as inline style by the consumer (computed from
+   getBoundingClientRect on the anchor). The CSS positioning fallback
+   below is for inline tooltips that don't compute coords — primarily the
+   docs page samples that wrap a `<button>` + tooltip inline rather than
+   portaling. Real consumers should use the portal pattern from
+   IconButton. */
+.tooltip-below {
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.tooltip-above {
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  animation-name: tooltipFadeInAbove;
+}
+
+.tooltip-right {
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  animation-name: tooltipFadeInRight;
+}
+
+.tooltip-arrow {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: var(--color-surface-dark);
+  transform: rotate(45deg);
+}
+
+.tooltip-below .tooltip-arrow {
+  top: -4px;
+  left: 50%;
+  margin-left: -4px;
+}
+
+.tooltip-above .tooltip-arrow {
+  bottom: -4px;
+  left: 50%;
+  margin-left: -4px;
+}
+
+.tooltip-right .tooltip-arrow {
+  left: -4px;
+  top: 50%;
+  margin-top: -4px;
+}
+
+.tooltip-title {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.tooltip-description {
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  color: var(--color-text);
+}
+
+.tooltip-note {
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--text-xs);
+  font-style: italic;
+  color: var(--color-text-muted);
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes tooltipFadeInAbove {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes tooltipFadeInRight {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+
+/* ── Container patterns ─────────────────────────────────────────────────
+   Modal backdrop + card; floating-panel card; menu popover. */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: var(--color-scrim);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl);
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* On narrow phones (incl. iOS Display Zoom) trim the backdrop gutter so cards
+   get more width — fixed-width content like the Cloudflare Turnstile widget
+   (~300px) no longer overflows. Fullscreen takeover modals drop it entirely so
+   they sit truly edge-to-edge instead of leaving side gaps. */
+@media (max-width: 30rem) {
+  .modal-backdrop {
+    padding: var(--space-sm);
+  }
+
+  .modal-backdrop:has(.modal-card-fullscreen) {
+    padding: 0;
+  }
+}
+
+/* Card — opaque rectangle with a border, rounded corners, and a drop
+   shadow. The base atom for boxed surfaces: modal bodies, marketing
+   pricing tiles, feature cards, settings sub-sections, etc. Radius,
+   padding, and shadow are exposed as custom properties so consumers
+   can override without redeclaring the shape:
+
+     .marketing-tile  { --card-radius: var(--radius-xl); --card-padding: var(--space-xl); }
+     .settings-frame  { --card-radius: var(--radius-sm); --card-shadow: none; }
+
+   The base atom doesn't apply padding by default because container
+   shapes like .modal-card have child wrappers (header, body, action
+   row) that own their own padding. */
+.card {
+  --card-radius: var(--radius-lg);
+  --card-padding: 0;
+  --card-shadow: var(--shadow-modal);
+  background: var(--color-overlay);
+  border: 1px solid var(--color-border);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  padding: var(--card-padding);
+}
+
+/* .modal-card — modifier on .card for cards living inside a
+   .modal-backdrop. Adds full-width sizing and the dialog entrance
+   animation. Always compose as `class="card modal-card …"`. */
+.modal-card {
+  width: 100%;
+  animation: dialogEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* .modal-card-column — the scrollable-body layout shared by the full
+   modals (login, register, verify, settings, profile). The card caps at
+   viewport height and lays out as a flex column so a fixed header sits
+   above an internally scrolling body. Consumers set their own max-width.
+   Compose as `class="card modal-card modal-card-column …"`. */
+.modal-card-column {
+  max-height: calc(100svh - 3rem);
+  display: flex;
+  flex-direction: column;
+}
+
+/* .modal-header — the title-plus-close-button bar shared by every full
+   modal. flex-shrink: 0 keeps it from collapsing when the body scrolls.
+   Pair with .modal-title for the heading and .btn.btn-icon for the
+   close control. Per-modal sheets override only the mobile padding. */
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-xl) var(--space-xl) var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+/* .modal-divider — full-width <hr> between sections of a modal body. */
+.modal-divider {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  margin: var(--space-xs) 0;
+}
+
+/* .modal-card-fullscreen — on phones the modal takes over the viewport
+   (settings, profile). Composes on .modal-card-column; includes the
+   safe-area-aware header padding so notched phones don't clip the title.
+   The compound selector is deliberate: per-modal sheets load after this
+   file and set their own max-width at (0,1,0), so the takeover must win
+   at (0,2,0) — fullscreen beats the per-modal cap regardless of order. */
+@media (max-width: 30rem) {
+  .modal-card.modal-card-fullscreen {
+    max-width: 100%;
+    max-height: 100svh;
+    height: 100svh;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+  }
+
+  .modal-card-fullscreen .modal-header {
+    padding: calc(var(--space-lg) + env(safe-area-inset-top, 0px))
+      var(--space-lg) var(--space-lg);
+  }
+}
+
+/* Frosted-glass card that floats over the map. Pair with backdrop-blur
+   surface tokens. Use for popovers, detail floats, and bottom-anchored
+   selection panels.
+
+   Note: overflow is intentionally NOT set here. Some consumers need
+   overflow: hidden (panels with internal scrollable content or
+   hover-bg list items so they clip to the rounded corners); some
+   need overflow: visible (containers with children that pop OUT,
+   like the progress bar with its popover dropdowns). Each consumer
+   declares overflow explicitly. */
+.floating-panel-card {
+  background: var(--color-surface-frosted);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Compact menu popover — action lists that float next to the thing they
+   act on (avatar dropdown, rename/delete menus on map and target-area
+   items). Same surface as .floating-panel-card with smaller radius. */
+.menu-popover {
+  background: var(--color-surface-frosted);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-popover);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  overflow: hidden;
+  z-index: var(--z-popover);
+}
+
+.menu-popover-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.menu-popover-item:hover:not(:disabled):not(.disabled) {
+  background: var(--color-divider);
+}
+
+.menu-popover-item:disabled,
+.menu-popover-item.disabled {
+  opacity: var(--opacity-faint);
+  cursor: default;
+}
+
+.menu-popover-item svg {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.menu-popover-item.danger,
+.menu-popover-item.danger svg {
+  color: var(--color-error);
+}
+
+/* ── Confirm dialog ─────────────────────────────────────────────────────
+   Composes on .modal-backdrop / .modal-card. Adds:
+     - .modal-backdrop-stacked: bumps z-index so the dialog can layer
+       above an already-open SettingsModal (or similar).
+     - .confirm-dialog: tighter min/max width and a flex column so the
+       content area can scroll independently of the action row.
+     - .confirm-dialog-content: padded body wrapper, sized to flex
+       inside the column so its overflow handling stays well-defined.
+     - .confirm-dialog-message: muted paragraph immediately under the
+       modal title.
+     - .confirm-dialog-actions: padded variant of .action-row that
+       drops the row to the bottom of the dialog without inheriting the
+       body padding above.
+
+   Consumers: ConfirmDialog · DeleteMapDialog · DisconnectStravaDialog ·
+   StravaBulkExportDialog · TargetAreaNameDialog · MapNameDialog. */
+
+.modal-backdrop-stacked {
+  z-index: var(--z-modal-stacked);
+}
+
+.confirm-dialog {
+  min-width: min(360px, 100%);
+  max-width: 440px;
+  max-height: calc(100svh - 48px);
+  display: flex;
+  flex-direction: column;
+}
+
+.confirm-dialog-content {
+  padding: var(--space-xl) var(--space-xl) var(--space-xl);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.confirm-dialog-content .modal-title {
+  margin-bottom: var(--space-sm);
+}
+
+.confirm-dialog-message {
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+/* Action row at the bottom of a .confirm-dialog. Composes on .action-row
+   for the flex shape; adds the bottom-padding that lifts the row off
+   the dialog edge. */
+.confirm-dialog-actions {
+  padding: 0 var(--space-xl) var(--space-xl);
+}
+
+/* ── Typography role classes ────────────────────────────────────────────
+   Compose primitives into the most-repeated text roles. */
+
+.modal-title {
+  font-family: var(--font-sans);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-text);
+  margin: 0;
+}
+
+.section-title {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-lg);
+}
+
+.field-label {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.field-value {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.form-label {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  letter-spacing: var(--tracking-snug);
+  margin-bottom: var(--space-sm);
+}
+
+.form-input {
+  width: 100%;
+  padding: var(--space-md) var(--space-md);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-base);
+  box-sizing: border-box;
+}
+
+.form-input::placeholder {
+  color: color-mix(in srgb, var(--color-text-muted) 50%, transparent);
+}
+
+.form-input:hover {
+  border-color: var(--color-border-strong);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.form-input:disabled {
+  background: var(--color-bg);
+  cursor: not-allowed;
+  opacity: var(--opacity-muted);
+}
+
+/* Size modifier — composes with .form-input for compact inputs in dense rows
+   (filter panels, inline track-detail fields, etc.). */
+.form-input-sm {
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-sm);
+}
+
+/* Select — same surface/border treatment as .form-input. Vertical
+   padding is intentionally tighter (sm vs md): native <select> controls
+   render their own internal caret affordance, which adds vertical
+   weight; the tighter padding compensates so a select sitting next to
+   an input has the same overall height. */
+.form-select {
+  padding: var(--space-sm) var(--space-md);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.form-select:hover {
+  border-color: var(--color-border-strong);
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.form-select:disabled {
+  background: var(--color-bg);
+  cursor: not-allowed;
+  opacity: var(--opacity-muted);
+}
+
+/* Native radios and checkboxes — tinted to the brand primary, fixed at
+   16px so they don't jitter between consumers. Apply at the element
+   level (no class needed) because every radio/checkbox in the app
+   should look the same. */
+input[type="radio"],
+input[type="checkbox"] {
+  accent-color: var(--color-primary);
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+input[type="radio"]:disabled,
+input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-muted);
+}
+
+/* Field group — the conceptual unit of <label> + <input> + (optional)
+   inline error. Compose .form-label and .form-input (or .form-select)
+   inside .field-group; add .field-group-error as needed. */
+.field-group {
+  margin-bottom: var(--space-lg);
+}
+
+/* Compact inline error — composes on top of .alert.alert-error to
+   tighten spacing when the error appears directly under a field. */
+.field-group-error {
+  margin-top: var(--space-sm);
+  margin-bottom: 0;
+}
+
+/* ── Marketing foundations ──────────────────────────────────────────────
+   Page-level scaffolding for the marketing site (and any longform
+   in-app content). Compose these into landing pages: a `.section-band`
+   for each full-bleed alternating background; a `.container` inside
+   it to constrain the content column; `.prose` to drop in a styled
+   article; and `.link` for inline links. None of these are wired into
+   the app yet — they're additive primitives waiting to be composed. */
+
+/* Container — full-width, centered, with horizontal padding that
+   scales up at md/lg. Default max-width is the standard marketing
+   column (1100px). Width modifiers (`.container-prose`,
+   `.container-standard`, `.container-wide`) override max-width to
+   match the content's intent. */
+.container {
+  width: 100%;
+  max-width: var(--container-standard);
+  margin-inline: auto;
+  padding-inline: var(--space-lg);
+}
+
+@media (min-width: 48rem) {
+  .container {
+    padding-inline: var(--space-xl);
+  }
+}
+
+@media (min-width: 64rem) {
+  .container {
+    padding-inline: var(--space-2xl);
+  }
+}
+
+.container-prose {
+  max-width: var(--container-prose);
+}
+.container-standard {
+  max-width: var(--container-standard);
+}
+.container-wide {
+  max-width: var(--container-wide);
+}
+
+/* Link atom — inline anchor with the canonical brand-color underlined
+   look. */
+
+.link {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+  transition: color var(--transition-base);
+}
+
+.link:hover {
+  color: var(--color-primary-hover);
+}
+
+.link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-xs);
+}
+
+.link:visited {
+  color: var(--color-primary);
+}
+
+.link:active {
+  color: var(--color-primary-hover);
+}
+
+/* Nav link — header/footer cluster style. Muted ink, no underline,
+   hovers to primary. Compose with `.text-button` to apply to a
+   `<button>` element. */
+.nav-link {
+  color: var(--color-text);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  transition: color var(--transition-base);
+}
+
+/* Pseudo-classes follow LVHA order: `:visited` must precede `:hover`/`:active`
+   or a visited link keeps the visited color on hover (equal specificity, later
+   rule wins) — which reads as the hover color flashing back to the base. */
+.nav-link:visited {
+  color: var(--color-text);
+}
+
+.nav-link:hover {
+  color: var(--color-primary);
+}
+
+.nav-link:active {
+  color: var(--color-primary);
+}
+
+.nav-link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-xs);
+}
+
+/* Text-button — element reset that makes a `<button>` look like inline
+   text. No visuals of its own; compose with `.link` or `.nav-link` to
+   inherit those styles while remaining a real `<button>` semantically. */
+.text-button {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.text-button:disabled,
+.text-button.disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-muted);
+}
+
+/* Section bands — full-bleed background stripes that compose a
+   marketing page. Each band owns its background and its text-color
+   defaults; place a `.container` inside to constrain content width.
+   Padding-block scales up at md/lg so bands feel taller on larger
+   screens. */
+
+.section-band {
+  width: 100%;
+  padding-block: var(--space-2xl);
+}
+
+@media (min-width: 48rem) {
+  .section-band {
+    padding-block: var(--space-4xl);
+  }
+}
+
+.section-band-light {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.section-band-light-warm {
+  background: var(--color-bg-warm);
+  color: var(--color-text);
+}
+
+.section-band-light-cool {
+  background: var(--color-bg-cool);
+  color: var(--color-text);
+}
+
+/* Dark section bands rebind --color-text / --color-text-muted via the
+   .surface-dark selector list in tokens.css, so default body text and
+   link colors inside the band read correctly without per-rule paints.
+   Only background is owned here. */
+.section-band-dark-neutral {
+  background: var(--color-bg-marketing-dark);
+  color: var(--color-text);
+}
+
+.section-band-dark-brand {
+  background: var(--color-primary);
+  color: var(--color-text);
+}
+
+.section-band-dark-brand .link {
+  color: var(--color-text);
+  text-decoration-color: var(--color-text-muted);
+}
+
+/* Primary button on the brand band would otherwise be magenta on
+   magenta (invisible). Override to a white-outlined transparent style
+   that reads against the saturated background. Tokens come from the
+   .section-band-dark-brand rebinding in tokens.css. */
+.section-band-dark-brand .btn-primary {
+  background: transparent;
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+}
+
+.section-band-dark-brand .btn-primary:hover {
+  background: var(--color-fill);
+  border-color: var(--color-text);
+}
+
+/* Prose — styled longform content. Wrap any block of marketing or
+   doc copy in `<div class="prose">` (or `<article class="prose">`)
+   and the descendants get the full type treatment: scaled headings,
+   readable paragraph rhythm, styled lists, blockquote, code, hr.
+   Spacing uses the "lobotomized owl" pattern (`> * + *`) so every
+   block-level child gets top-margin except the first. */
+
+.prose {
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+}
+
+.prose > * + * {
+  margin-top: var(--space-lg);
+}
+
+.prose > :first-child {
+  margin-top: 0;
+}
+
+.prose h1 {
+  font-size: var(--text-5xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  margin-top: var(--space-2xl);
+}
+
+.prose h2 {
+  font-size: var(--text-4xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  margin-top: var(--space-2xl);
+}
+
+.prose h3 {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-snug);
+  margin-top: var(--space-xl);
+}
+
+.prose h4 {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-snug);
+  margin-top: var(--space-xl);
+}
+
+.prose > h1:first-child,
+.prose > h2:first-child,
+.prose > h3:first-child,
+.prose > h4:first-child {
+  margin-top: 0;
+}
+
+.prose p {
+  line-height: var(--leading-normal);
+}
+
+.prose a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+  transition: color var(--transition-base);
+}
+
+.prose a:hover {
+  color: var(--color-primary-hover);
+}
+
+.prose strong {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.prose em {
+  font-style: italic;
+}
+
+.prose blockquote {
+  padding-left: var(--space-lg);
+  border-left: 3px solid var(--color-border-strong);
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.prose code {
+  font-family: var(--font-mono);
+  font-size: inherit;
+  padding: 0.15em var(--space-xs);
+  background: var(--color-fill);
+  border-radius: var(--radius-xs);
+}
+
+.prose pre {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  padding: var(--space-lg);
+  background: var(--color-fill);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+}
+
+.prose pre code {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+.prose ul,
+.prose ol {
+  padding-left: var(--space-xl);
+}
+
+.prose ul {
+  list-style: disc;
+}
+
+.prose ol {
+  list-style: decimal;
+}
+
+.prose li + li {
+  margin-top: var(--space-sm);
+}
+
+.prose li::marker {
+  color: var(--color-text-muted);
+}
+
+.prose hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+}
+
+/* ── Visual atoms ───────────────────────────────────────────────────────
+   Small, composable patterns reused across multiple panels. Each atom
+   owns its visual shape; bespoke wrapper classes at the call site own
+   only local layout/sizing concerns. */
+
+/* Search input — input with an overlaid left icon and an optional right
+   element (clear button or spinner). The wrapper handles positioning;
+   the field itself reserves padding for the icon and the right slot.
+
+   Compose: `.search-input` on the wrapper · `.search-input-field` on
+   the <input> (with optional bespoke wrapper class for local sizing) ·
+   `.search-input-icon` on the leading icon · `.search-input-clear` on
+   the trailing clear button. The trailing slot can also host a spinner;
+   add `.spinning` to the icon to swap the leading icon to a spinning
+   loader (driven by the shared `spin` keyframe in this file). */
+
+.search-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input-field {
+  width: 100%;
+  padding: var(--space-sm) var(--space-2xl);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color var(--transition-base);
+  box-sizing: border-box;
+}
+
+.search-input-field:focus {
+  border-color: var(--color-primary);
+}
+
+.search-input-field::placeholder {
+  color: var(--color-text-muted);
+}
+
+.search-input-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.search-input-icon.spinning {
+  animation: spin 0.8s linear infinite;
+}
+
+.search-input-clear {
+  position: absolute;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.search-input-clear:hover {
+  color: var(--color-text);
+  background: var(--color-fill);
+}
+
+/* Chips — pill-shaped labels used to toggle filter facets and to display
+   already-applied filters. Two related shapes:
+
+   `.chip` (toggle) — the medium-sized clickable pill (filter panel
+   facet toggles). Default is muted/bordered; add `.chip-selected` (or
+   `aria-pressed="true"` styling at call site) when on.
+
+   `.chip-active` (applied-filter tag) — the smaller pill that displays
+   a currently-applied filter and removes it on click. Pre-colored to
+   read as "this filter is on" (primary-subtle bg, primary border, primary
+   text). Distinct from `.chip` because it's both smaller AND a different
+   color treatment — those two differences together justify a sibling
+   atom rather than a size modifier. */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-md);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.chip-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.chip:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.chip-selected {
+  background: var(--color-primary-subtle);
+  border-color: var(--color-primary-ring);
+  color: var(--color-primary);
+}
+
+.chip-selected:hover {
+  background: var(--color-primary-ring);
+  border-color: var(--color-primary-shadow);
+  color: var(--color-primary);
+}
+
+/* Size modifier — compose with .chip (+ optionally .chip-selected) to
+   get a smaller, more secondary chip. Matches the dimensions of the
+   .chip-active "applied filter pill" but keeps .chip's toggleable
+   selector semantics. */
+.chip-sm {
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--text-xs);
+}
+
+.chip-active {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+  border: 1px solid var(--color-primary-ring);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.chip-active:hover {
+  background: var(--color-primary-ring);
+  border-color: var(--color-primary-shadow);
+}
+
+/* Isolation chip — a distinct accent marks it as a different kind of
+   filter (a temporary "show only these" view) from the data filters. */
+.chip-isolation {
+  color: var(--color-info);
+  background: var(--color-info-subtle);
+  border-color: var(--color-info-ring);
+}
+
+.chip-isolation:hover {
+  background: var(--color-info-ring);
+  border-color: var(--color-info);
+}
+
+/* Empty state — "no content yet" placeholder. Default layout is vertical
+   (icon stacked over message, generous top padding); add `.empty-state-inline`
+   for a single-row layout used in tight contexts (e.g. inline rail panels).
+
+   `.empty-state-message` is the small/muted secondary hint that sits
+   below the primary message in the vertical variant. */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--space-2xl) 0 var(--space-lg);
+  color: var(--color-text-muted);
+}
+
+.empty-state-inline {
+  flex-direction: row;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg) 0;
+  font-size: var(--text-sm);
+  text-align: initial;
+}
+
+.empty-state-icon {
+  margin-bottom: var(--space-md);
+  opacity: var(--opacity-faint);
+}
+
+.empty-state-inline .empty-state-icon {
+  margin-bottom: 0;
+  opacity: 1;
+}
+
+.empty-state p {
+  font-size: var(--text-md);
+  margin: 0;
+}
+
+.empty-state-message {
+  font-size: var(--text-sm);
+  margin-top: var(--space-xs);
+  opacity: var(--opacity-muted);
+}
+
+/* Progress bar — slim horizontal track with a fill child. The fill comes
+   in two flavors:
+
+   `.progress-bar-fill` — determinate. Consumers set inline `width: N%`;
+   transitions on width animate the change.
+
+   `.progress-bar-indeterminate` — solid bouncing variant. Used when
+   total work is unknown.
+
+   The fill color is `--color-primary` by default. Override per-context
+   by setting `--progress-bar-fill-color` on the wrapper (or by writing
+   a one-line bespoke rule on the consumer's wrapper class). */
+
+.progress-bar {
+  --progress-bar-fill-color: var(--color-primary);
+  width: 100%;
+  height: 4px;
+  background: var(--color-border);
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--progress-bar-fill-color);
+  border-radius: var(--radius-xs);
+  transition: width 0.3s ease-out;
+}
+
+.progress-bar-indeterminate {
+  height: 100%;
+  width: 40%;
+  background: var(--progress-bar-fill-color);
+  border-radius: var(--radius-xs);
+  animation: progress-bar-indeterminate 1.4s ease-in-out infinite;
+}
+
+@keyframes progress-bar-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+/* Badge — small inline label. Distinct from `.pill` (which is a floating
+   frosted chrome element over the map) and from `.chip` (which is a
+   clickable filter affordance). Use a badge to annotate a card or row
+   with a static tag — "Most popular" on a pricing tier, "Beta" next to
+   a feature name, "v2" on a section title.
+
+   Compose: `.badge` for the muted default · `.badge .badge-brand` for
+   magenta-tinted. Sizing is small by default; consumers wrap or place
+   absolutely as needed (e.g. pricing tile's offset badge). */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-md);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  background: var(--color-fill);
+  border-radius: var(--radius-lg);
+  line-height: var(--leading-flat);
+}
+
+.badge-brand {
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+/* Accordion — a stack of expandable rows inside a rounded, bordered
+   card. Each row is implemented as a controlled JS pattern (button +
+   aria-expanded + aria-controls) rather than the native `<details>`
+   element. The CSS grid-rows trick (`grid-template-rows: 0fr → 1fr`)
+   animates the body's height smoothly — which `<details>` cannot do
+   today without browser-prefixed `::details-content` or
+   `interpolate-size` (Chrome-only). The trade-off is a small amount of
+   JS state, in exchange for guaranteed-smooth expand/collapse across
+   every browser.
+
+   Compose: `<div class="accordion">` wrapping one or more
+   `<div class="accordion-item">`, each holding a
+   `<button class="accordion-item-summary" aria-expanded aria-controls>`
+   and a `<div class="accordion-item-body" id>` whose inner child holds
+   the body content. Add `.accordion-item-body-open` to the body (or
+   drive it off the summary's `[aria-expanded="true"]`) for the open
+   state. The `<AccordionItem>` React component wires all of this up and
+   supports both controlled (`open`/`onToggle`) and uncontrolled
+   (`defaultOpen`) modes; the summary accepts any ReactNode, so rows can
+   carry an icon, status, or trailing controls — not just a label. */
+
+.accordion {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-overlay);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.accordion-item + .accordion-item {
+  border-top: 1px solid var(--color-border);
+}
+
+.accordion-item-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  width: 100%;
+  padding: var(--space-md) var(--space-lg);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-semibold);
+  text-align: left;
+  color: var(--color-text);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background var(--transition-base);
+}
+
+.accordion-item-summary:hover {
+  background: var(--color-fill);
+}
+
+/* Inset ring (not the haloed --focus-ring) so the indicator isn't
+   clipped by the container's `overflow: hidden`. */
+.accordion-item-summary:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.accordion-item-chevron {
+  color: var(--color-text-muted);
+  transition: transform var(--transition-slow);
+  flex-shrink: 0;
+}
+
+.accordion-item-summary[aria-expanded="true"] .accordion-item-chevron {
+  transform: rotate(180deg);
+}
+
+.accordion-item-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--transition-slow);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  color: var(--color-text-muted);
+}
+
+.accordion-item-body-open {
+  grid-template-rows: 1fr;
+}
+
+.accordion-item-body-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.accordion-item-body-open .accordion-item-body-inner {
+  padding: var(--space-xs) var(--space-lg) var(--space-lg);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Composable components
+   ─────────────────────────────────────────────────────────────────────────
+   The reusable content patterns (hero, feature card, feature row,
+   step list, screenshot frame, CTA section, pricing tile, FAQ accordion)
+   that landing pages and app surfaces both compose with. Compose with the
+   foundations (`.container`, `.section-band`, `.card`, `.btn`, etc.)
+   rather than re-implementing the same shapes.
+
+   Breakpoint literals match `--bp-md` (48rem). @media rules can't read
+   CSS custom properties, so we duplicate the value here. Keep in sync
+   with tokens.css if --bp-md ever moves. */
+
+/* ── Hero ─────────────────────────────────────────────────────────────
+   Top-of-page block. Heading uses --text-5xl on desktop, scales down
+   at narrower viewports. Two layouts:
+   - .hero-align-left + .hero-media → text/media side-by-side at md+
+   - .hero-align-center → centered single column
+
+   Rendered inside a .section-band (consumer picks the tone). */
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xl);
+}
+
+.hero-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  max-width: 36rem;
+}
+
+.hero-eyebrow {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.hero-title {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  margin: 0;
+}
+
+.hero-subtitle {
+  font-size: var(--text-lg);
+  line-height: var(--leading-normal);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
+}
+
+.hero-media {
+  width: 100%;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-hero);
+}
+
+.hero-media > * {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.hero-align-center {
+  align-items: center;
+  text-align: center;
+}
+
+.hero-align-center .hero-body {
+  align-items: center;
+}
+
+.hero-align-center .hero-actions {
+  justify-content: center;
+}
+
+@media (min-width: 48rem) {
+  .hero-title {
+    font-size: var(--text-4xl);
+  }
+}
+
+@media (min-width: 64rem) {
+  .hero-title {
+    font-size: var(--text-5xl);
+  }
+
+  .hero-align-left {
+    flex-direction: row;
+    align-items: center;
+    gap: 4rem;
+  }
+
+  .hero-align-left .hero-body {
+    flex: 1 1 50%;
+  }
+
+  .hero-align-left .hero-media {
+    flex: 1 1 50%;
+  }
+}
+
+/* ── Editorial body grid + annotation ─────────────────────────────────
+   The two-column body layout used by marketing sections that want a
+   margin-style annotation aside next to a primary content column.
+   Default ratio is `1fr 3fr` so the annotation reads as marginalia, not
+   as a secondary column. Stacks to a single column at narrow widths
+   (annotation above content) since marginalia can't really read as
+   marginalia when there's no margin. Consumers can override the
+   stacking breakpoint locally if their content needs it.
+
+   .annotation is the small editorial aside that lives in the narrow
+   column. It carries an ink-colored 2px top rule + a mono meta label
+   + mono body prose. <strong>highlights</strong> inside the body
+   shift to ink-color for emphasis. */
+
+.body-grid {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 3fr);
+  gap: clamp(var(--space-2xl), 4vw, var(--space-4xl));
+  align-items: start;
+}
+
+@media (max-width: 56rem) {
+  /* ~896px — same threshold as `.hero-grid` so multi-column layouts
+     across the public site stack together. Below this width the
+     annotation column gets too narrow for its mono prose to wrap
+     readably. */
+  .body-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-xl);
+  }
+}
+
+.annotation {
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--space-xs);
+  border-top: 2px solid var(--color-text);
+}
+
+.annotation-meta {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+.annotation-body {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  color: var(--color-text-muted);
+  margin: var(--space-md) 0 0;
+}
+
+.annotation-body strong {
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ── Animations used by component classes above ─────────────────────── */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dialogEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.full-page-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: var(--color-text-muted);
+}
+
+/* Credential list — shared chrome for vertically-stacked rows of
+   account credentials/sessions with a name, metadata line, and a
+   trailing action (API Tokens and Authorized Apps panels). Each panel
+   keeps its own per-row specifics (mono token prefix, current-session
+   badge) in its colocated CSS. */
+.cred-list {
+  --card-radius: var(--radius-sm);
+  --card-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+}
+
+.cred-list-loading {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+  padding: var(--space-2xl) 0;
+}
+
+.cred-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-lg) var(--space-lg);
+  background: var(--color-overlay);
+  transition: background var(--transition-base);
+}
+
+.cred-row:not(:last-child) {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.cred-row:hover {
+  background: var(--color-bg);
+}
+
+/* Flexible stacked text column: fills available row width and lets its
+   children truncate (min-width:0). Shared by credential rows, the
+   delete-map option rows, and panel header titles. */
+.stack-fill {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  flex: 1;
+  min-width: 0;
+}
+
+.cred-row-name {
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  letter-spacing: var(--tracking-snug);
+}
+
+.cred-row-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cred-row-meta-sep {
+  opacity: var(--opacity-faint);
+}
+
+@media (max-width: 30rem) {
+  .cred-row {
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+
+  .cred-row-meta {
+    flex-basis: 100%;
+    order: 3;
+  }
+}

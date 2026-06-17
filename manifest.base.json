@@ -4,8 +4,25 @@
   "short_name": "CTM Importer",
   "version": "0.0.0",
   "description": "Detect GPS file downloads (GPX, FIT, TCX, KML, KMZ) and offer to import them into Color The Map.",
-  "permissions": ["downloads"],
-  "host_permissions": [],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqnMhYZnAho7nuO2haGY8NziWiZowcWHAZyFwchuLnbTfKIhrFpvkZpA/SicV4hHAt8VbCYw8vlklCfTz1MOoSwM72pCDvhafotX25ggm8HSBlaVNUGwm/6Rt4r68Ea0Ongk950VHc5uC/hc5Vdjwgax4h+WQmXovFIWdGAGMQIW0rHIZcVPyfEnwoSw6wAs0Xvy/BR5ZaIAI8NjsyAR4gFZAVDe2bruzMEcmZSqYkFqBScX6wVxG65jIvwf5Ught+2poSRH6/5AKvWIF3krtpfesuaFxEsXN3Ngk9pAab2Qe4+m0+n5DPbhnKFn3+FRNahyqfljtxG1BM3wEY407NQIDAQAB",
+  "permissions": ["downloads", "identity", "alarms", "storage"],
+  "host_permissions": [
+    "https://dev.colorthemap.app/*",
+    "https://colorthemap.app/*"
+  ],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "Color The Map Importer",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
   "background": {
     "service_worker": "background.ts",
     "type": "module"
@@ -28,10 +45,6 @@
       "world": "MAIN"
     }
   ],
-  "action": {
-    "default_title": "Color The Map Importer",
-    "default_popup": "popup.html"
-  },
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true

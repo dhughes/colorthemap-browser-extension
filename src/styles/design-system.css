@@ -1,0 +1,13 @@
+/* Canonical design-system entry point. Aggregates fonts, tokens, and
+   components so a consumer pulls the DS in with a single name. Adding,
+   splitting, or removing DS source files only touches this aggregator.
+
+   Cascade rule: each shared document should import this file exactly
+   once. The logged-in app and the public site share one document (same
+   SPA), so only `app.css` imports the DS — `public-site.css` is an
+   overlay on top of an already-loaded DS. The docs page lives in its
+   own HTML document and imports this file directly. */
+
+@import "./fonts.css";
+@import "./tokens.css";
+@import "./components.css";

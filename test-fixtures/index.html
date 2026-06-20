@@ -53,40 +53,42 @@
     <p class="note">
       <strong>Use real exports — not hand-made files.</strong> Drop genuine GPS
       files exported from real services into <code>test-fixtures/files/</code>
-      using the names below. They are git-ignored on purpose: real exports carry
-      personal location data and must never be committed.
+      (any filename) and reload — the list below is generated from whatever is in
+      that folder. They are git-ignored on purpose: real exports carry personal
+      location data and must never be committed.
     </p>
 
     <section>
       <h2>Detectors C &amp; B — real files (drop into <code>files/</code>)</h2>
       <p>
-        Expect a “Send to CTM” badge next to each link (Detector C). Clicking a
-        badge logs <code>[detector:C] … source=link</code>. Right-click → “Save
-        Link As” for Detector B (<code>source=download</code>, Chrome/Edge only).
+        Click a GPS link (Detector C): the browser’s normal download proceeds
+        <em>and</em> a “Send to Color The Map” dialog opens. Pick a map (shown
+        only if you have more than one) and Send to upload. Right-click → “Save
+        Link As” still logs <code>[detector:B] … source=download</code>
+        (Chrome/Edge only) — Detector B isn’t wired to the dialog yet.
       </p>
       <p class="note">
-        Detectors C and B flag candidates by <strong>extension/MIME only</strong>
-        — neither can read the file bytes here, so the file’s content is
-        confirmed (magic-byte sniff) later, at send time. Only Detector A
-        validates now, because it already holds the intercepted response body.
+        Detector C flags candidates by <strong>extension only</strong> — it
+        can’t read the file bytes here, so content is confirmed (magic-byte
+        sniff) server-side at upload time. A file with a GPS extension but
+        non-GPS content (see the negatives below) uploads, then CTM rejects it
+        and the dialog surfaces CTM’s actual error.
       </p>
-      <ul>
-        <li><a href="./files/sample.gpx">files/sample.gpx</a></li>
-        <li><a href="./files/sample.fit">files/sample.fit</a></li>
-        <li><a href="./files/sample.tcx">files/sample.tcx</a></li>
-        <li><a href="./files/sample.kml">files/sample.kml</a></li>
-        <li><a href="./files/sample.kmz">files/sample.kmz</a></li>
-        <li>
-          Query-string variant:
-          <a href="./files/sample.gpx?token=abc123">files/sample.gpx?token=…</a>
-        </li>
-        <li>Control (no badge expected): <a href="./index.html">index.html</a></li>
+      <ul id="real-files">
+        <li>Loading files from <code>files/</code>…</li>
       </ul>
+      <p>
+        Control (no dialog expected):
+        <a href="./index.html">index.html</a>
+      </p>
     </section>
 
     <section>
       <h2>Detector C — dynamically added link (MutationObserver)</h2>
-      <p>A badge should appear on the link the moment it is inserted.</p>
+      <p>
+        The inserted link should be wired the moment it appears — clicking it
+        opens the Send-to-CTM dialog.
+      </p>
       <button id="add-link">Add a GPX link via JS</button>
       <div id="dynamic-target"></div>
     </section>
@@ -94,12 +96,11 @@
     <section>
       <h2>Negative cases — content that isn’t GPS</h2>
       <p>
-        Each file carries a GPS extension but holds non-GPS content. Because
-        Detector C and B don’t read the bytes, clicking a badge or saving the
-        link still logs <code>would send</code> (an unvalidated candidate — that
-        gets caught at send time). The <strong>fetch</strong> button next to each
-        exercises Detector A, which inspects the body and must log
-        <strong>nothing</strong>.
+        Each file carries a GPS extension but holds non-GPS content. Clicking a
+        link opens the dialog (Detector C flags by extension) — Send it and CTM
+        rejects the content, so the dialog should show CTM’s actual error. The
+        <strong>fetch</strong> button next to each exercises Detector A, which
+        inspects the body and must do <strong>nothing</strong> (no dialog).
       </p>
       <ul>
         <li>
@@ -136,8 +137,8 @@
       <p>
         Detector A wraps the page’s own <code>fetch</code>/XHR. These calls are
         same-origin (this page → its own server), so the wrap sees them — no
-        CORS issue. Each logs <code>[detector:A] …</code> and does not save a
-        file, so Detector B stays quiet.
+        CORS issue. Each one now opens the Send-to-CTM dialog with the
+        intercepted bytes already captured (no re-fetch needed).
       </p>
       <ul>
         <li>
@@ -179,6 +180,36 @@
     </section>
 
     <script>
+      (async () => {
+        const list = document.getElementById("real-files");
+        try {
+          const html = await (await fetch("./files/")).text();
+          const doc = new DOMParser().parseFromString(html, "text/html");
+          const names = [...doc.querySelectorAll("a[href]")]
+            .map((a) => decodeURIComponent(a.getAttribute("href")))
+            .map((href) => href.replace(/^\.?\//, ""))
+            .filter((name) => name && !name.startsWith(".") && !name.includes("/"));
+
+          list.replaceChildren();
+          if (names.length === 0) {
+            list.innerHTML =
+              "<li>No files yet — drop GPS exports into <code>test-fixtures/files/</code> and reload.</li>";
+            return;
+          }
+          for (const name of names.sort()) {
+            const li = document.createElement("li");
+            const a = document.createElement("a");
+            a.href = "./files/" + encodeURIComponent(name);
+            a.textContent = "files/" + name;
+            li.append(a);
+            list.append(li);
+          }
+        } catch {
+          list.innerHTML =
+            "<li>Could not read <code>files/</code> — is this served over HTTP (e.g. <code>npx http-server test-fixtures</code>)?</li>";
+        }
+      })();
+
       document.getElementById("add-link").addEventListener("click", () => {
         const a = document.createElement("a");
         a.href = "./files/sample.kml";

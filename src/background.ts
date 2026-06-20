@@ -11,6 +11,7 @@ import {
   type DetectionMessage,
 } from "./shared/messages";
 import { initDetectorB } from "./detectors/detector-b";
+import { handleUploadMessage } from "./upload/handler";
 
 console.log(aliveMessage("background"));
 
@@ -35,10 +36,12 @@ browser.runtime.onStartup.addListener(() => {
   void refreshIfNeeded();
 });
 
-// Auth entry points (install, options, detector surfaces) converge here:
-// surfaces post a typed message; the SW owns the flow.
-browser.runtime.onMessage.addListener((message: unknown) =>
-  handleAuthMessage(message),
+// Auth and upload entry points converge here: surfaces post a typed message;
+// the SW owns the flow. Each handler returns undefined for messages it doesn't
+// own, so `??` falls through to the next.
+browser.runtime.onMessage.addListener(
+  (message: unknown) =>
+    handleAuthMessage(message) ?? handleUploadMessage(message),
 );
 
 // The toolbar button has no popup — clicking it opens the settings page, the

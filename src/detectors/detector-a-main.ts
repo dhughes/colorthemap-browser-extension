@@ -1,28 +1,68 @@
+import {
+  filenameFromContentDisposition,
+  filenameFromUrl,
+} from "../shared/detection-url";
+import type { GpsFormat } from "../shared/formats";
 import { isDetectionEnabledForHost } from "../shared/gate";
 import { classifyResponse } from "../shared/response-sniff";
-import { DETECTOR_A_MARKER, type DetectorAVia } from "./detector-a-protocol";
+import {
+  DETECTOR_A_MARKER,
+  type DetectorAMessage,
+  type DetectorAVia,
+} from "./detector-a-protocol";
 
-function report(format: string, via: DetectorAVia, url: string): void {
-  const message = { marker: DETECTOR_A_MARKER, format, via, url };
-  window.postMessage(message, window.location.origin);
-}
+// CTM's single-file cap. Bigger bodies aren't buffered for upload (the server
+// would reject them anyway); detection still reports so the URL can be tried.
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
-async function inspect(
+function report(
+  format: GpsFormat,
   via: DetectorAVia,
   url: string,
-  contentType: string | undefined,
-  contentDisposition: string | undefined,
-  body: ReadableStream<Uint8Array> | null,
-): Promise<void> {
-  const format = await classifyResponse({
+  filename: string,
+  bytes: ArrayBuffer | null,
+): void {
+  const message: DetectorAMessage = {
+    marker: DETECTOR_A_MARKER,
+    format,
+    via,
     url,
-    contentType,
-    contentDisposition,
-    body,
-  });
-  if (format) {
-    report(format, via, url);
+    filename,
+  };
+  if (bytes) {
+    message.bytes = bytes;
+    // Transfer the buffer (it's a fresh copy, never the page's live body) so a
+    // multi-MB file doesn't get structured-clone-copied across the boundary.
+    window.postMessage(message, window.location.origin, [bytes]);
+  } else {
+    window.postMessage(message, window.location.origin);
   }
+}
+
+function filenameFor(
+  url: string,
+  contentDisposition: string | undefined,
+  format: GpsFormat,
+): string {
+  if (contentDisposition) {
+    const fromHeader = filenameFromContentDisposition(contentDisposition);
+    if (fromHeader) {
+      return fromHeader;
+    }
+  }
+  return filenameFromUrl(url, format);
+}
+
+async function readCappedBytes(
+  response: Response,
+): Promise<ArrayBuffer | null> {
+  const len = Number(response.headers.get("content-length"));
+  if (Number.isFinite(len) && len > MAX_UPLOAD_BYTES) {
+    void response.body?.cancel();
+    return null;
+  }
+  const buffer = await response.arrayBuffer();
+  return buffer.byteLength <= MAX_UPLOAD_BYTES ? buffer : null;
 }
 
 function requestUrl(input: RequestInfo | URL): string {
@@ -40,14 +80,34 @@ function wrapFetch(): void {
   window.fetch = async function (...args) {
     const response = await originalFetch.apply(this, args);
     try {
-      const clone = response.clone();
-      await inspect(
-        "fetch",
-        response.url || requestUrl(args[0]),
-        response.headers.get("content-type") ?? undefined,
-        response.headers.get("content-disposition") ?? undefined,
-        clone.body,
-      );
+      // Two clones: one consumed (head only) to classify, one held back to
+      // buffer the full body — but only once the response is confirmed GPS, so
+      // non-GPS responses are never fully read.
+      const sniffClone = response.clone();
+      const bytesClone = response.clone();
+      const url = response.url || requestUrl(args[0]);
+      const contentType = response.headers.get("content-type") ?? undefined;
+      const contentDisposition =
+        response.headers.get("content-disposition") ?? undefined;
+
+      const format = await classifyResponse({
+        url,
+        contentType,
+        contentDisposition,
+        body: sniffClone.body,
+      });
+      if (!format) {
+        void bytesClone.body?.cancel();
+      } else {
+        const bytes = await readCappedBytes(bytesClone);
+        report(
+          format,
+          "fetch",
+          url,
+          filenameFor(url, contentDisposition, format),
+          bytes,
+        );
+      }
     } catch {
       // Sniffing must never break the page's own fetch.
     }
@@ -88,12 +148,26 @@ function wrapXhr(): void {
 
 async function inspectXhr(xhr: TaggedXhr): Promise<void> {
   try {
-    await inspect(
+    const url = xhr.responseURL || xhr.__ctmUrl || "";
+    const contentType = xhr.getResponseHeader("content-type") ?? undefined;
+    const contentDisposition =
+      xhr.getResponseHeader("content-disposition") ?? undefined;
+
+    const format = await classifyResponse({
+      url,
+      contentType,
+      contentDisposition,
+      body: xhrBody(xhr),
+    });
+    if (!format) {
+      return;
+    }
+    report(
+      format,
       "xhr",
-      xhr.responseURL || xhr.__ctmUrl || "",
-      xhr.getResponseHeader("content-type") ?? undefined,
-      xhr.getResponseHeader("content-disposition") ?? undefined,
-      xhrBody(xhr),
+      url,
+      filenameFor(url, contentDisposition, format),
+      xhrBytes(xhr),
     );
   } catch {
     // Best-effort.
@@ -113,6 +187,28 @@ function xhrBody(xhr: TaggedXhr): ReadableStream<Uint8Array> | null {
     default:
       return null;
   }
+}
+
+// A transferable copy of the loaded body — never the page's own buffer, which
+// transferring would detach. Blob/JSON/document types are skipped (the
+// background re-fetches the URL instead).
+function xhrBytes(xhr: TaggedXhr): ArrayBuffer | null {
+  let buffer: ArrayBuffer | null = null;
+  switch (xhr.responseType) {
+    case "":
+    case "text":
+      buffer = xhr.responseText
+        ? new TextEncoder().encode(xhr.responseText).buffer
+        : null;
+      break;
+    case "arraybuffer":
+      buffer =
+        xhr.response instanceof ArrayBuffer ? xhr.response.slice(0) : null;
+      break;
+    default:
+      buffer = null;
+  }
+  return buffer && buffer.byteLength <= MAX_UPLOAD_BYTES ? buffer : null;
 }
 
 export function initDetectorAMain(): void {

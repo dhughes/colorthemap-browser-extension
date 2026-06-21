@@ -1,0 +1,5 @@
+This file is named .kmz but is plain text, not a ZIP archive. A real KMZ
+begins with the ZIP magic bytes "PK\x03\x04". The extension's content sniff
+requires that signature (plus a .kmz extension/MIME), so Detector A (fetch/XHR)
+must reject this on content (no dialog). A link still flags it by extension;
+sending then surfaces Color The Map's import error.

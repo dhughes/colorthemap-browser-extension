@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Almost a KML document, but the root element is <Document> with no enclosing
+  <kml> wrapper. The structural sniff keys off the XML root element, so
+  Detector A (fetch/XHR) must reject this on content (no dialog). A link still
+  flags it by extension; sending then surfaces Color The Map's import error.
+-->
+<Document xmlns="http://www.opengis.net/kml/2.2">
+  <name>Sample Google Earth Data</name>
+  <Placemark>
+    <name>A line</name>
+    <LineString>
+      <coordinates>-78.9063,35.9904,0 -78.9064,35.9903,0</coordinates>
+    </LineString>
+  </Placemark>
+</Document>

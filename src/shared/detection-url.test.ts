@@ -5,6 +5,7 @@ import {
   formatForFilename,
   formatForUrl,
   isAmbiguousDownloadUrl,
+  linkDownloadFormat,
   safeFilename,
 } from "./detection-url";
 
@@ -44,6 +45,83 @@ describe("formatForUrl", () => {
     expect(formatForUrl("https://example.com/")).toBeNull();
     expect(formatForUrl("not a url")).toBeNull();
     expect(formatForUrl("")).toBeNull();
+  });
+});
+
+describe("linkDownloadFormat", () => {
+  it("falls back to the path extension like formatForUrl", () => {
+    expect(linkDownloadFormat("https://example.com/route.gpx")).toBe("gpx");
+    expect(linkDownloadFormat("https://example.com/tour.kmz?dl=1")).toBe("kmz");
+    expect(linkDownloadFormat("https://example.com/photo.jpg")).toBeNull();
+  });
+
+  it("reads the format from a query param (MapMyFitness routes)", () => {
+    expect(
+      linkDownloadFormat(
+        "https://www.mapmyfitness.com/v7.2/route/1156937188/?format=gpx&field_set=detailed",
+      ),
+    ).toBe("gpx");
+    expect(
+      linkDownloadFormat(
+        "https://www.mapmyfitness.com/v7.2/route/1156937188/?format=kml&field_set=detailed",
+      ),
+    ).toBe("kml");
+  });
+
+  it("reads the format from a bare trailing path segment on an export path (MMF workout)", () => {
+    expect(
+      linkDownloadFormat(
+        "https://www.mapmyfitness.com/workout/export/1597560212/tcx",
+      ),
+    ).toBe("tcx");
+  });
+
+  it("reads the format from a mid-path segment on an export path (Polar Flow)", () => {
+    expect(
+      linkDownloadFormat(
+        "https://flow.polar.com/api/export/training/tcx/8357513887?compress=false",
+      ),
+    ).toBe("tcx");
+    expect(
+      linkDownloadFormat(
+        "https://flow.polar.com/api/export/training/fit/8357513887",
+      ),
+    ).toBe("fit");
+    expect(
+      linkDownloadFormat(
+        "https://flow.polar.com/api/export/training/gpx/8357513887?compress=false",
+      ),
+    ).toBe("gpx");
+  });
+
+  it("still resolves the Polar zip variant by format (content sniff filters it later)", () => {
+    // The zip link shares the TCX path; URL-level it looks like TCX. The dialog's
+    // same-origin matchesFormat check rejects the zip bytes, so no dialog shows.
+    expect(
+      linkDownloadFormat(
+        "https://flow.polar.com/api/export/training/tcx/8357513887?compress=true",
+      ),
+    ).toBe("tcx");
+  });
+
+  it("does not match non-GPS export segments like CSV", () => {
+    expect(
+      linkDownloadFormat(
+        "https://flow.polar.com/api/export/training/csv/8357513887?compress=false",
+      ),
+    ).toBeNull();
+  });
+
+  it("does not match format-named segments on non-download paths", () => {
+    expect(linkDownloadFormat("https://example.com/gpx/help")).toBeNull();
+    expect(
+      linkDownloadFormat("https://example.com/blog/tcx-explained"),
+    ).toBeNull();
+  });
+
+  it("returns null for unparseable input", () => {
+    expect(linkDownloadFormat("not a url")).toBeNull();
+    expect(linkDownloadFormat("")).toBeNull();
   });
 });
 

@@ -1,4 +1,4 @@
-import { filenameFromUrl, formatForUrl } from "../shared/detection-url";
+import { filenameFromUrl, linkDownloadFormat } from "../shared/detection-url";
 import { isDetectionEnabledForHost } from "../shared/gate";
 import { requestUploadDialog } from "../ui/upload-dialog";
 
@@ -10,15 +10,16 @@ function evaluateLink(link: HTMLAnchorElement): void {
   if (handled.has(link)) {
     return;
   }
-  const format = formatForUrl(link.href);
+  const format = linkDownloadFormat(link.href);
   if (!format) {
     return;
   }
   handled.add(link);
   // No preventDefault: the browser's normal download still proceeds. We only
-  // *also* offer to send the file to CTM. The file's content is confirmed
-  // (magic-byte sniff) server-side at upload time — Detector C can't read the
-  // bytes here, so this flags by extension only.
+  // *also* offer to send the file to CTM. Detector C flags by URL only (path
+  // extension, a ?format= param, or an export-path segment); the bytes are
+  // confirmed at send — for a same-origin link the dialog sniffs them first, so
+  // a URL-level false positive never reaches CTM.
   link.addEventListener("click", () => {
     void requestUploadDialog({
       url: link.href,

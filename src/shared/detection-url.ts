@@ -108,3 +108,52 @@ export function isAmbiguousDownloadUrl(url: string): boolean {
   const hasPathHint = DOWNLOAD_HINT_PATH.test(parsed.pathname.toLowerCase());
   return hasParamHint || hasPathHint;
 }
+
+const DOWNLOAD_FORMAT_PARAMS = new Set([
+  "format",
+  "type",
+  "fileformat",
+  "exportformat",
+]);
+
+function formatForKeyword(value: string): GpsFormat | null {
+  const keyword = value.toLowerCase();
+  return GPS_FORMATS.find((spec) => spec.format === keyword)?.format ?? null;
+}
+
+// Broader than formatForUrl (which reads only a path extension): also resolves
+// download links that encode the format in a query param (`?format=gpx`) or as a
+// path segment on an export/download path (`/export/<id>/tcx`,
+// `/api/export/training/tcx/<id>`). Real services — MapMyFitness, Polar Flow —
+// deliver GPS files through such extension-less anchors. Detector C flags links
+// by URL only, so a false positive is harmless: the same-origin content sniff
+// (or CTM at send) rejects anything whose bytes don't match the claimed format —
+// which is exactly how Polar's `?compress=true` zip variants get filtered out.
+export function linkDownloadFormat(url: string): GpsFormat | null {
+  const byExtension = formatForUrl(url);
+  if (byExtension) {
+    return byExtension;
+  }
+  const parsed = parseUrl(url);
+  if (!parsed) {
+    return null;
+  }
+  for (const [key, value] of parsed.searchParams) {
+    if (DOWNLOAD_FORMAT_PARAMS.has(key.toLowerCase())) {
+      const format = formatForKeyword(value);
+      if (format) {
+        return format;
+      }
+    }
+  }
+  const path = parsed.pathname.toLowerCase();
+  if (DOWNLOAD_HINT_PATH.test(path)) {
+    for (const segment of path.split("/")) {
+      const format = formatForKeyword(segment);
+      if (format) {
+        return format;
+      }
+    }
+  }
+  return null;
+}

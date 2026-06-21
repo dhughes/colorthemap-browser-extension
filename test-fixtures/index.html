@@ -142,13 +142,17 @@
     </section>
 
     <section>
-      <h2>Detector A — real-site sanity check (optional)</h2>
-      <p class="muted">
-        The local buttons cover the mechanism. For real-world shapes the static
-        server can't reproduce (POST → bytes, custom content-types), spot-check a
-        real export: <strong>Komoot</strong> (open a tour → Export GPX) or
-        <strong>Strava</strong> (an activity's Export GPX). Each should open the
-        dialog with the intercepted bytes.
+      <h2>Real-site verification</h2>
+      <p>
+        The local samples can't reproduce everything real sites do — cross-origin
+        requests, POST → bytes, custom content types, blob downloads. So also
+        verify against sites the extension doesn't control. Sign in to a service
+        like <strong>Strava</strong>, <strong>Polar Flow</strong>, or
+        <strong>MapMyFitness</strong>, open an activity or route, and
+        download/export it in each format the site offers (GPX, TCX, FIT, and
+        KML/KMZ where available). Confirm the “Send to Color The Map” dialog
+        appears for each download — i.e. the detectors actually catch the file as
+        it comes across.
       </p>
     </section>
 

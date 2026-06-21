@@ -1,3 +1,4 @@
+import { bytesToBase64 } from "../shared/base64";
 import {
   filenameFromContentDisposition,
   filenameFromUrl,
@@ -29,14 +30,12 @@ function report(
     url,
     filename,
   };
+  // Encode here, in the main world, so only a string crosses to the isolated
+  // bridge — an ArrayBuffer arrives page-realm in Firefox (instanceof fails).
   if (bytes) {
-    message.bytes = bytes;
-    // Transfer the buffer (it's a fresh copy, never the page's live body) so a
-    // multi-MB file doesn't get structured-clone-copied across the boundary.
-    window.postMessage(message, window.location.origin, [bytes]);
-  } else {
-    window.postMessage(message, window.location.origin);
+    message.bytesBase64 = bytesToBase64(bytes);
   }
+  window.postMessage(message, window.location.origin);
 }
 
 function filenameFor(

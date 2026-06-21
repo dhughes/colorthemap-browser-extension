@@ -10,10 +10,12 @@ export interface DetectorAMessage {
   via: DetectorAVia;
   url: string;
   filename: string;
-  // The intercepted response body, transferred from the main world so the
-  // upload doesn't have to re-fetch. Absent when too large to buffer or the
-  // response type couldn't be read — the background then re-fetches the URL.
-  bytes?: ArrayBuffer;
+  // The intercepted response body, base64-encoded in the main world. Sent as a
+  // string (not an ArrayBuffer) because a buffer crossing the MAIN -> isolated
+  // content-script boundary arrives page-realm in Firefox, where
+  // `instanceof ArrayBuffer` is false. Absent when too large or unreadable —
+  // the background then re-fetches the URL.
+  bytesBase64?: string;
 }
 
 export function isDetectorAMessage(value: unknown): value is DetectorAMessage {
@@ -27,6 +29,7 @@ export function isDetectorAMessage(value: unknown): value is DetectorAMessage {
     (candidate.via === "fetch" || candidate.via === "xhr") &&
     typeof candidate.url === "string" &&
     typeof candidate.filename === "string" &&
-    (candidate.bytes === undefined || candidate.bytes instanceof ArrayBuffer)
+    (candidate.bytesBase64 === undefined ||
+      typeof candidate.bytesBase64 === "string")
   );
 }

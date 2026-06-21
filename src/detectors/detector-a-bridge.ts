@@ -4,12 +4,13 @@ import { isDetectorAMessage } from "./detector-a-protocol";
 
 export function initDetectorABridge(): void {
   window.addEventListener("message", (event) => {
-    // event.source === window is the load-bearing guard (another window can't
-    // forge it); the origin check is a secondary filter. This is structural
-    // disambiguation, NOT authentication — same-origin page scripts can also
-    // post here, so the upload is gated by the user's explicit Send click and
-    // CTM's server-side magic-byte validation, never by trusting these bytes.
-    if (event.source !== window || event.origin !== location.origin) {
+    // Same-origin only. This is a structural filter, NOT authentication:
+    // same-origin page scripts can post here too, so the upload is gated by the
+    // user's explicit Send click and CTM's server-side validation, never by
+    // trusting these bytes. We deliberately do NOT check event.source === window
+    // — Firefox's MAIN/isolated content-script wrappers make that identity check
+    // fail even for our own main-world post.
+    if (event.origin !== location.origin) {
       return;
     }
     if (!isDetectorAMessage(event.data)) {
@@ -19,13 +20,13 @@ export function initDetectorABridge(): void {
       return;
     }
     // The page fetched a GPS file — offer to also send it to CTM. The bytes the
-    // main world captured ride along, so the upload doesn't re-fetch.
+    // main world captured ride along (base64), so the upload doesn't re-fetch.
     openUploadDialog({
       url: event.data.url,
       filename: event.data.filename,
       format: event.data.format,
       sourceHostname: location.hostname,
-      bytes: event.data.bytes,
+      bytesBase64: event.data.bytesBase64,
     });
   });
 }

@@ -19,9 +19,10 @@ export interface UploadDialogRequest {
   filename: string;
   format: GpsFormat;
   sourceHostname: string;
-  // Detector A's intercepted bytes. When absent, the background re-fetches the
-  // URL (Detector C link path) and the dialog must first secure host permission.
-  bytes?: ArrayBuffer;
+  // Detector A's intercepted body, base64-encoded. When absent, the dialog reads
+  // a same-origin file directly (link path) or, failing that, the background
+  // re-fetches the URL after a host permission is granted.
+  bytesBase64?: string;
 }
 
 // Opens the "Send to Color The Map" dialog for one detected file. A DOM-level
@@ -187,19 +188,29 @@ class UploadDialog {
     }
     const mapId = this.selectedMapId;
 
-    // Resolve the file as a Blob. Detector A already captured the bytes; for a
-    // link the content script reads the same-origin file directly (cookies
-    // included, no host permission). Only a genuinely cross-origin file needs
+    // Resolve the file bytes as base64. Detector A already captured them. For a
+    // link, read the same-origin file directly (cookies included, no host
+    // permission) and encode via Blob + FileReader — manual typed-array access
+    // trips Firefox's Xray membrane. Only a genuinely cross-origin file needs
     // the background to re-fetch it, which requires a per-site host permission.
-    let blob = this.request.bytes ? new Blob([this.request.bytes]) : null;
-    if (!blob) {
-      blob = await this.fetchSameOriginBlob();
+    let bytesBase64 = this.request.bytesBase64;
+    if (bytesBase64 === undefined) {
+      const blob = await this.fetchSameOriginBlob();
       if (!blob && !(await this.ensureHostPermission())) {
         this.renderResult({
           tone: "error",
           message: `Color The Map needs permission to read the file from ${new URL(this.request.url).host}.`,
         });
         return;
+      }
+      if (blob) {
+        try {
+          bytesBase64 = await blobToBase64(blob);
+        } catch (error) {
+          console.error("[ctm] encode failed", error);
+          this.renderResult({ tone: "error", message: messageOf(error) });
+          return;
+        }
       }
     }
 
@@ -208,10 +219,6 @@ class UploadDialog {
 
     let result: UploadResult;
     try {
-      // Encode via Blob + FileReader, not manual typed-array access: Firefox's
-      // Xray membrane blocks `new Uint8Array(buffer)` on bytes that originated
-      // from a content-script fetch ("Permission denied to access constructor").
-      const bytesBase64 = blob ? await blobToBase64(blob) : undefined;
       result = (await browser.runtime.sendMessage(
         uploadMessage({
           mapId,

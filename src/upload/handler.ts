@@ -26,6 +26,7 @@ async function handleListMaps(): Promise<ListMapsResult> {
     const accessToken = await getAccessToken();
     return { ok: true, maps: await fetchMaps(accessToken) };
   } catch (error) {
+    console.error("[ctm] list maps failed", error);
     return { ok: false, error: errorMessage(error) };
   }
 }
@@ -47,6 +48,7 @@ async function handleUpload(message: UploadMessage): Promise<UploadResult> {
       bytes,
     });
   } catch (error) {
+    console.error("[ctm] upload failed", error);
     return { status: "error", detail: errorMessage(error) };
   }
 }

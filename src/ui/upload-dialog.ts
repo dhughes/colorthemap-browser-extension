@@ -1,6 +1,5 @@
 import browser from "webextension-polyfill";
 import { CTM_BASE_URL } from "../auth/config";
-import { bytesToBase64 } from "../shared/base64";
 import { getFormatSpec, type GpsFormat } from "../shared/formats";
 import { getLastMapForHost, setLastMapForHost } from "../upload/last-map";
 import {
@@ -102,6 +101,7 @@ class UploadDialog {
         listMapsMessage(),
       )) as ListMapsResult;
     } catch (error) {
+      console.error("[ctm] list maps failed", error);
       this.renderResult({ tone: "error", message: messageOf(error) });
       return;
     }
@@ -187,14 +187,14 @@ class UploadDialog {
     }
     const mapId = this.selectedMapId;
 
-    // Resolve the file bytes. Detector A already captured them. For a link, the
-    // content script can read a same-origin file directly (cookies included, no
-    // host permission). Only a genuinely cross-origin file needs the background
-    // to re-fetch it, which requires a per-site host permission.
-    let bytes = this.request.bytes;
-    if (!bytes) {
-      bytes = (await this.fetchSameOriginBytes()) ?? undefined;
-      if (!bytes && !(await this.ensureHostPermission())) {
+    // Resolve the file as a Blob. Detector A already captured the bytes; for a
+    // link the content script reads the same-origin file directly (cookies
+    // included, no host permission). Only a genuinely cross-origin file needs
+    // the background to re-fetch it, which requires a per-site host permission.
+    let blob = this.request.bytes ? new Blob([this.request.bytes]) : null;
+    if (!blob) {
+      blob = await this.fetchSameOriginBlob();
+      if (!blob && !(await this.ensureHostPermission())) {
         this.renderResult({
           tone: "error",
           message: `Color The Map needs permission to read the file from ${new URL(this.request.url).host}.`,
@@ -208,16 +208,21 @@ class UploadDialog {
 
     let result: UploadResult;
     try {
+      // Encode via Blob + FileReader, not manual typed-array access: Firefox's
+      // Xray membrane blocks `new Uint8Array(buffer)` on bytes that originated
+      // from a content-script fetch ("Permission denied to access constructor").
+      const bytesBase64 = blob ? await blobToBase64(blob) : undefined;
       result = (await browser.runtime.sendMessage(
         uploadMessage({
           mapId,
           filename: this.request.filename,
           format: this.request.format,
           url: this.request.url,
-          bytesBase64: bytes ? bytesToBase64(bytes) : undefined,
+          bytesBase64,
         }),
       )) as UploadResult;
     } catch (error) {
+      console.error("[ctm] upload request failed", error);
       this.renderResult({ tone: "error", message: messageOf(error) });
       return;
     }
@@ -227,7 +232,7 @@ class UploadDialog {
   // Reads a same-origin file directly from the content script — cookies
   // included, no host permission. Returns null for cross-origin URLs or any
   // failure, so the caller can fall back to the permission + re-fetch path.
-  private async fetchSameOriginBytes(): Promise<ArrayBuffer | null> {
+  private async fetchSameOriginBlob(): Promise<Blob | null> {
     let url: URL;
     try {
       url = new URL(this.request.url);
@@ -241,7 +246,7 @@ class UploadDialog {
       const response = await fetch(this.request.url, {
         credentials: "include",
       });
-      return response.ok ? await response.arrayBuffer() : null;
+      return response.ok ? await response.blob() : null;
     } catch {
       return null;
     }
@@ -341,6 +346,34 @@ function spinnerRow(label: string): HTMLElement {
   return row;
 }
 
+// Base64 via native FileReader rather than typed-array access, so it works
+// inside Firefox's content-script Xray membrane.
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      resolve(result.slice(result.indexOf(",") + 1));
+    };
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("Could not read file"));
+    reader.readAsDataURL(blob);
+  });
+}
+
 function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : "Something went wrong.";
+  if (error instanceof Error) {
+    return error.message;
+  }
+  // A rejected Error from the background context fails `instanceof Error` here
+  // (different realm), so read its message structurally before giving up.
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof (error as { message: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+  return "Something went wrong.";
 }

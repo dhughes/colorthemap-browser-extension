@@ -61,11 +61,17 @@
     <section>
       <h2>Detectors C &amp; B — real files (drop into <code>files/</code>)</h2>
       <p>
-        Click a GPS link (Detector C): the browser’s normal download proceeds
-        <em>and</em> a “Send to Color The Map” dialog opens. Pick a map (shown
-        only if you have more than one) and Send to upload. Right-click → “Save
-        Link As” still logs <code>[detector:B] … source=download</code>
-        (Chrome/Edge only) — Detector B isn’t wired to the dialog yet.
+        Click a GPS <strong>link</strong> (Detector C): the browser’s normal
+        download proceeds <em>and</em> a “Send to Color The Map” dialog opens.
+        The <strong>fetch + save</strong> / <strong>XHR + save</strong> buttons
+        simulate a real “Export” button (Komoot/Strava): the page fetches the
+        file (Detector A → same dialog, intercepted bytes uploaded directly, no
+        re-fetch) <em>and</em> saves it locally itself. The extension neither
+        causes nor blocks that local save, so Cancel leaves the downloaded file
+        in place. Pick a map (shown only if you have more than one) and Send.
+        Right-click → “Save Link As”
+        still logs <code>[detector:B] … source=download</code> (Chrome/Edge
+        only) — Detector B isn’t wired to the dialog yet.
       </p>
       <p class="note">
         Detector C flags candidates by <strong>extension only</strong> — it
@@ -180,6 +186,19 @@
     </section>
 
     <script>
+      // Save bytes to disk the way a real export button does (blob URL + a
+      // synthetic download click), so the fetch/XHR buttons mimic real sites.
+      function saveBlob(blob, filename) {
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = objectUrl;
+        a.download = filename;
+        document.body.append(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      }
+
       (async () => {
         const list = document.getElementById("real-files");
         try {
@@ -197,11 +216,41 @@
             return;
           }
           for (const name of names.sort()) {
+            const url = "./files/" + encodeURIComponent(name);
             const li = document.createElement("li");
+
             const a = document.createElement("a");
-            a.href = "./files/" + encodeURIComponent(name);
+            a.href = url;
             a.textContent = "files/" + name;
-            li.append(a);
+
+            // Detector A — simulate a real "Export" button: the page fetches
+            // the file (intercepted in the main world → dialog) AND saves it
+            // locally itself, the way Komoot/Strava do. The extension neither
+            // causes nor blocks that local save. Listeners are attached here
+            // because these elements are created after the one-time
+            // [data-fetch]/[data-xhr] wiring runs.
+            const fetchBtn = document.createElement("button");
+            fetchBtn.textContent = "fetch + save";
+            fetchBtn.style.marginInlineStart = "8px";
+            fetchBtn.addEventListener("click", async () => {
+              const response = await fetch(url);
+              saveBlob(await response.blob(), name);
+            });
+
+            const xhrBtn = document.createElement("button");
+            xhrBtn.textContent = "XHR + save";
+            xhrBtn.style.marginInlineStart = "4px";
+            xhrBtn.addEventListener("click", () => {
+              const xhr = new XMLHttpRequest();
+              xhr.open("GET", url);
+              xhr.responseType = "arraybuffer";
+              xhr.addEventListener("load", () => {
+                saveBlob(new Blob([xhr.response]), name);
+              });
+              xhr.send();
+            });
+
+            li.append(a, " ", fetchBtn, xhrBtn);
             list.append(li);
           }
         } catch {

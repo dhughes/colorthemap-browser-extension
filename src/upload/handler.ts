@@ -1,5 +1,7 @@
 import { getAccessToken } from "../auth/service";
 import { base64ToBytes } from "../shared/base64";
+import { getFormatSpec } from "../shared/formats";
+import { matchesFormat } from "../shared/sniff";
 import { fetchMaps } from "./maps";
 import {
   isListMapsMessage,
@@ -41,6 +43,18 @@ async function handleUpload(message: UploadMessage): Promise<UploadResult> {
       message.bytesBase64 !== undefined
         ? base64ToBytes(message.bytesBase64)
         : await fetchFileBytes(message.url);
+
+    // Validate the bytes against the claimed format before uploading. Detector A
+    // already content-checked its bytes, but the link/download paths (C/B) only
+    // know the extension/MIME — so an HTML-named-.gpx reaches here. Reject it
+    // locally with a clear message instead of round-tripping to CTM for a 400.
+    if (!matchesFormat(new Uint8Array(bytes), message.format)) {
+      return {
+        status: "error",
+        detail: `This doesn't look like a valid ${getFormatSpec(message.format).label} file.`,
+      };
+    }
+
     return await uploadTrack({
       accessToken,
       mapId: message.mapId,

@@ -1,6 +1,8 @@
 import browser from "webextension-polyfill";
 import { CTM_BASE_URL } from "../auth/config";
+import { base64ToBytes } from "../shared/base64";
 import { getFormatSpec, type GpsFormat } from "../shared/formats";
+import { matchesFormat } from "../shared/sniff";
 import { getLastMapForHost, setLastMapForHost } from "../upload/last-map";
 import {
   listMapsMessage,
@@ -26,6 +28,84 @@ export interface UploadDialogRequest {
 }
 
 const HOST_URL_ATTR = "data-ctm-url";
+
+// Validates a detected file BEFORE offering the dialog, then opens it (parity
+// with Detector A, which content-checks up front). For a same-origin file the
+// content script reads it and confirms the bytes match the claimed format — if
+// not, no dialog; if so, the validated bytes ride into the dialog so Send needn't
+// re-fetch. Bytes already in hand (Detector A) skip straight to opening.
+//
+// A cross-origin file can't be read here (CORS) → open and validate at Send.
+//
+// A same-origin read that *fails* is almost always the link click's navigation
+// aborting our in-flight fetch. We don't open in that case — Detector B catches
+// the resulting download and validates it without that race.
+const inFlight = new Set<string>();
+
+export async function requestUploadDialog(
+  request: UploadDialogRequest,
+): Promise<void> {
+  if (request.bytesBase64 !== undefined) {
+    openUploadDialog(request);
+    return;
+  }
+  if (
+    inFlight.has(request.url) ||
+    document.querySelector(HOST_TAG)?.getAttribute(HOST_URL_ATTR) ===
+      request.url
+  ) {
+    return;
+  }
+  if (!isSameOrigin(request.url)) {
+    openUploadDialog(request);
+    return;
+  }
+
+  inFlight.add(request.url);
+  try {
+    const blob = await fetchBlob(request.url);
+    if (!blob) {
+      // Same-origin read failed — almost certainly the click's navigation
+      // aborting our fetch. Defer to Detector B (the download), which validates
+      // without the race; opening here would skip validation.
+      return;
+    }
+    // Validate via the base64 string, not the blob's ArrayBuffer directly:
+    // FileReader.readAsArrayBuffer yields a page-realm buffer in Firefox, and any
+    // typed-array op on it trips the Xray membrane. readAsDataURL yields a string
+    // (realm-safe), and base64ToBytes rebuilds content-realm bytes. Reuse the
+    // base64 for the upload too.
+    const bytesBase64 = await blobToBase64(blob);
+    const head = new Uint8Array(base64ToBytes(bytesBase64)).subarray(0, 2048);
+    if (!matchesFormat(head, request.format)) {
+      return; // not actually this format — no dialog
+    }
+    openUploadDialog({ ...request, bytesBase64 });
+  } catch (error) {
+    console.error("[ctm] pre-validation failed", error);
+  } finally {
+    inFlight.delete(request.url);
+  }
+}
+
+function isSameOrigin(rawUrl: string): boolean {
+  try {
+    return new URL(rawUrl).origin === location.origin;
+  } catch {
+    return false;
+  }
+}
+
+// Reads a same-origin file from the content script — cookies included, no host
+// permission. Returns null on any failure (including a navigation-aborted fetch).
+async function fetchBlob(rawUrl: string): Promise<Blob | null> {
+  try {
+    const response = await fetch(rawUrl, { credentials: "include" });
+    return response.ok ? await response.blob() : null;
+  } catch {
+    return null;
+  }
+}
 
 // Opens the "Send to Color The Map" dialog for one detected file. A DOM-level
 // singleton (works across the separate content-script bundles): if a dialog is
@@ -209,7 +289,9 @@ class UploadDialog {
     // the background to re-fetch it, which requires a per-site host permission.
     let bytesBase64 = this.request.bytesBase64;
     if (bytesBase64 === undefined) {
-      const blob = await this.fetchSameOriginBlob();
+      const blob = isSameOrigin(this.request.url)
+        ? await fetchBlob(this.request.url)
+        : null;
       if (!blob && !(await this.ensureHostPermission())) {
         this.renderResult({
           tone: "error",
@@ -248,29 +330,6 @@ class UploadDialog {
       return;
     }
     this.renderResult(describeOutcome(result));
-  }
-
-  // Reads a same-origin file directly from the content script — cookies
-  // included, no host permission. Returns null for cross-origin URLs or any
-  // failure, so the caller can fall back to the permission + re-fetch path.
-  private async fetchSameOriginBlob(): Promise<Blob | null> {
-    let url: URL;
-    try {
-      url = new URL(this.request.url);
-    } catch {
-      return null;
-    }
-    if (url.origin !== location.origin) {
-      return null;
-    }
-    try {
-      const response = await fetch(this.request.url, {
-        credentials: "include",
-      });
-      return response.ok ? await response.blob() : null;
-    } catch {
-      return null;
-    }
   }
 
   private async ensureHostPermission(): Promise<boolean> {

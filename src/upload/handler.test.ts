@@ -57,7 +57,7 @@ describe("upload", () => {
   });
 
   it("re-fetches the URL when no bytes are supplied (link path)", async () => {
-    const fetched = new ArrayBuffer(4);
+    const fetched = new TextEncoder().encode("<gpx></gpx>").buffer;
     mocked.fetchFileBytes.mockResolvedValue(fetched);
     mocked.uploadTrack.mockResolvedValue({ status: "ok" });
 
@@ -73,6 +73,22 @@ describe("upload", () => {
       bytes: fetched,
     });
     expect(result).toEqual({ status: "ok" });
+  });
+
+  it("rejects locally when the bytes don't match the claimed format", async () => {
+    // HTML re-fetched from a link the detector flagged as .gpx by extension.
+    mocked.fetchFileBytes.mockResolvedValue(
+      new TextEncoder().encode("<!doctype html><html></html>").buffer,
+    );
+
+    const result = (await handleUploadMessage(linkMessage)) as {
+      status: string;
+      detail?: string;
+    };
+
+    expect(mocked.uploadTrack).not.toHaveBeenCalled();
+    expect(result.status).toBe("error");
+    expect(result.detail).toContain("GPX");
   });
 
   it("decodes captured base64 bytes without re-fetching (Detector A path)", async () => {

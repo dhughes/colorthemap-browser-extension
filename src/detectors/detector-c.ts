@@ -1,6 +1,6 @@
 import { filenameFromUrl, formatForUrl } from "../shared/detection-url";
 import { isDetectionEnabledForHost } from "../shared/gate";
-import { openUploadDialog } from "../ui/upload-dialog";
+import { requestUploadDialog } from "../ui/upload-dialog";
 
 // Anchors we've already wired, so MutationObserver re-runs are no-ops.
 const handled = new WeakSet<HTMLAnchorElement>();
@@ -20,7 +20,7 @@ function evaluateLink(link: HTMLAnchorElement): void {
   // (magic-byte sniff) server-side at upload time — Detector C can't read the
   // bytes here, so this flags by extension only.
   link.addEventListener("click", () => {
-    openUploadDialog({
+    void requestUploadDialog({
       url: link.href,
       filename: filenameFromUrl(link.href, format),
       format,

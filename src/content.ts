@@ -1,7 +1,7 @@
 import browser from "webextension-polyfill";
 import { aliveMessage } from "./shared/alive";
 import { initDetectorC } from "./detectors/detector-c";
-import { openUploadDialog } from "./ui/upload-dialog";
+import { requestUploadDialog } from "./ui/upload-dialog";
 import { isOpenDialogMessage } from "./upload/messages";
 
 console.log(aliveMessage("content"), "on", location.href);
@@ -11,7 +11,7 @@ console.log(aliveMessage("content"), "on", location.href);
 // same-origin file itself on Send).
 browser.runtime.onMessage.addListener((message: unknown) => {
   if (isOpenDialogMessage(message)) {
-    openUploadDialog({
+    void requestUploadDialog({
       url: message.url,
       filename: message.filename,
       format: message.format,

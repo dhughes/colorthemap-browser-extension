@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Almost a Garmin TCX export, but the root element is <Activities> instead of
+  the required <TrainingCenterDatabase> wrapper. The extension's structural
+  sniff keys off the XML root element, so Detector A (fetch/XHR) must reject
+  this on content (no dialog). A link still flags it by extension; sending then
+  surfaces Color The Map's import error.
+-->
+<Activities xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2">
+  <Activity Sport="Biking">
+    <Id>2016-07-10T17:33:49Z</Id>
+    <Lap StartTime="2016-07-10T17:33:49Z">
+      <TotalTimeSeconds>2698.0</TotalTimeSeconds>
+      <DistanceMeters>13217.8</DistanceMeters>
+      <Track>
+        <Trackpoint>
+          <Time>2016-07-10T17:33:49Z</Time>
+          <Position>
+            <LatitudeDegrees>35.990402</LatitudeDegrees>
+            <LongitudeDegrees>-78.906296</LongitudeDegrees>
+          </Position>
+          <AltitudeMeters>87.0</AltitudeMeters>
+        </Trackpoint>
+        <Trackpoint>
+          <Time>2016-07-10T17:33:52Z</Time>
+          <Position>
+            <LatitudeDegrees>35.990296</LatitudeDegrees>
+            <LongitudeDegrees>-78.906374</LongitudeDegrees>
+          </Position>
+          <AltitudeMeters>87.2</AltitudeMeters>
+        </Trackpoint>
+      </Track>
+    </Lap>
+  </Activity>
+</Activities>

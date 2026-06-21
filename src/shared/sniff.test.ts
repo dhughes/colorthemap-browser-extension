@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shouldSniffBody, sniffBytes } from "./sniff";
+import { matchesFormat, shouldSniffBody, sniffBytes } from "./sniff";
 
 const encoder = new TextEncoder();
 
@@ -109,6 +109,40 @@ describe("sniffBytes", () => {
         {},
       ),
     ).toBe("gpx");
+  });
+});
+
+describe("matchesFormat", () => {
+  it("confirms each format against its own signature", () => {
+    expect(matchesFormat(bytes("<gpx></gpx>"), "gpx")).toBe(true);
+    expect(matchesFormat(bytes("<TrainingCenterDatabase/>"), "tcx")).toBe(true);
+    expect(matchesFormat(bytes('<kml xmlns="..."></kml>'), "kml")).toBe(true);
+    expect(matchesFormat(new Uint8Array(ZIP_MAGIC), "kmz")).toBe(true);
+    const fit = new Uint8Array([
+      0x0e, 0x10, 0x43, 0x08, 0x00, 0x00, 0x00, 0x00, 0x2e, 0x46, 0x49, 0x54,
+    ]);
+    expect(matchesFormat(fit, "fit")).toBe(true);
+  });
+
+  it("rejects bytes whose content doesn't match the claimed format", () => {
+    expect(matchesFormat(bytes("<!doctype html><html></html>"), "gpx")).toBe(
+      false,
+    );
+    expect(matchesFormat(bytes("<Activities></Activities>"), "tcx")).toBe(
+      false,
+    );
+    expect(matchesFormat(bytes("<Document></Document>"), "kml")).toBe(false);
+    expect(matchesFormat(bytes("not a zip"), "kmz")).toBe(false);
+    const badFit = new Uint8Array([
+      0x0e, 0x10, 0x43, 0x08, 0x00, 0x00, 0x00, 0x00, 0x2e, 0x46, 0x49, 0x61,
+    ]);
+    expect(matchesFormat(badFit, "fit")).toBe(false);
+  });
+
+  it("validates a KMZ by zip magic alone — no extension/MIME corroboration", () => {
+    // Unlike sniffBytes, matchesFormat trusts the claimed format, so a KMZ from
+    // an extensionless URL still validates.
+    expect(matchesFormat(new Uint8Array(ZIP_MAGIC), "kmz")).toBe(true);
   });
 });
 

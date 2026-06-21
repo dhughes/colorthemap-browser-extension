@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Sample Google Earth Data</name>
+    <Folder><name>Landmarks</name>
+      <Placemark><name>Eiffel Tower</name><Point><coordinates>2.2945,48.8584,0</coordinates></Point></Placemark>
+      <Placemark><name>Big Ben</name><Point><coordinates>-0.1246,51.5007,0</coordinates></Point></Placemark>
+      <Placemark><name>Statue of Liberty</name><Point><coordinates>-74.0445,40.6892,0</coordinates></Point></Placemark>
+    </Folder>
+  </Document>
+</kml>

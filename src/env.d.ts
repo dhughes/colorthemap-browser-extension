@@ -8,3 +8,10 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+// Vite `?raw` imports: the file's contents as a string. Used to inline the
+// design-system CSS into a content-script shadow root.
+declare module "*.css?raw" {
+  const content: string;
+  export default content;
+}

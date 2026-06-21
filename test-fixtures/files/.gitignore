@@ -1,5 +1,0 @@
-# Real GPS exports dropped here for manual detector verification contain
-# personal location/activity data — keep the folder, never commit the files.
-*
-!.gitignore
-!.gitkeep

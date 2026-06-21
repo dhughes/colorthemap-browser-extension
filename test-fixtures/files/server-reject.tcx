@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A structurally valid TCX (root <TrainingCenterDatabase>) so the content sniff
+  accepts it and the dialog appears. But the activity has only summary fields
+  and no <Track>/<Trackpoint> positions, so Color The Map has no track to import
+  and rejects it server-side. This exercises the "passes detection, fails at
+  CTM" path.
+-->
+<TrainingCenterDatabase
+    xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2">
+  <Activities>
+    <Activity Sport="Biking">
+      <Id>2016-07-10T17:33:49Z</Id>
+      <Lap StartTime="2016-07-10T17:33:49Z">
+        <TotalTimeSeconds>2698.0</TotalTimeSeconds>
+        <DistanceMeters>13217.8</DistanceMeters>
+        <Calories>498</Calories>
+      </Lap>
+    </Activity>
+  </Activities>
+</TrainingCenterDatabase>

@@ -1,4 +1,4 @@
-import { formatForMimeType, GPS_FORMATS } from "./formats";
+import { formatForMimeType, getFormatSpec, GPS_FORMATS } from "./formats";
 import type { GpsFormat } from "./formats";
 import {
   filenameFromContentDisposition,
@@ -117,6 +117,25 @@ export function sniffBytes(
   }
 
   return null;
+}
+
+// Confirm bytes are consistent with a SPECIFIC, already-claimed format. Used at
+// send time, where the format is known. Unlike sniffBytes (which disambiguates
+// an unknown response and needs corroboration for zip-based KMZ), this trusts
+// the format and checks only its signature — so a valid KMZ downloaded from an
+// extensionless URL still validates by its zip magic alone.
+export function matchesFormat(bytes: Uint8Array, format: GpsFormat): boolean {
+  const { signature } = getFormatSpec(format);
+  switch (signature.kind) {
+    case "bytes":
+      return matchesAt(bytes, signature.offset, signature.bytes);
+    case "xml-root": {
+      const root = xmlRootToken(bytes);
+      return root !== null && signature.rootTokens.includes(root);
+    }
+    case "zip":
+      return matchesAt(bytes, 0, ZIP_MAGIC);
+  }
 }
 
 export function shouldSniffBody(hints: SniffBodyHints): boolean {

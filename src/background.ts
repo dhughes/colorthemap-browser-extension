@@ -10,7 +10,9 @@ import {
   formatDetectionLog,
   type DetectionMessage,
 } from "./shared/messages";
-import { initDetectorB } from "./detectors/detector-b";
+import { initDetectorB, type DownloadDetection } from "./detectors/detector-b";
+import { handleUploadMessage } from "./upload/handler";
+import { openDialogMessage } from "./upload/messages";
 
 console.log(aliveMessage("background"));
 
@@ -35,10 +37,12 @@ browser.runtime.onStartup.addListener(() => {
   void refreshIfNeeded();
 });
 
-// Auth entry points (install, options, detector surfaces) converge here:
-// surfaces post a typed message; the SW owns the flow.
-browser.runtime.onMessage.addListener((message: unknown) =>
-  handleAuthMessage(message),
+// Auth and upload entry points converge here: surfaces post a typed message;
+// the SW owns the flow. Each handler returns undefined for messages it doesn't
+// own, so `??` falls through to the next.
+browser.runtime.onMessage.addListener(
+  (message: unknown) =>
+    handleAuthMessage(message) ?? handleUploadMessage(message),
 );
 
 // The toolbar button has no popup — clicking it opens the settings page, the
@@ -63,7 +67,35 @@ function handleDetection(message: DetectionMessage): void {
 }
 
 onDetection(handleDetection);
-initDetectorB((payload) => handleDetection(createDetectionMessage(payload)));
+
+// Detector B (the downloads API) runs in the background; the dialog is
+// content-script UI, so ask the active tab to open it. The download itself
+// proceeds normally — we only also offer to send it to Color The Map.
+async function openDownloadDialog(detection: DownloadDetection): Promise<void> {
+  try {
+    const [tab] = await browser.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
+    if (tab?.id != null) {
+      await browser.tabs.sendMessage(tab.id, openDialogMessage(detection));
+    }
+  } catch {
+    // No active tab or no content script there — nothing to open.
+  }
+}
+
+initDetectorB((detection) => {
+  handleDetection(
+    createDetectionMessage({
+      detector: "B",
+      format: detection.format,
+      source: "download",
+      url: detection.url,
+    }),
+  );
+  void openDownloadDialog(detection);
+});
 
 // onStartup only fires on browser launch; an evicted MV3 SW re-spun by any
 // event also needs the proactive check, so run it on every SW evaluation

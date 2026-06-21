@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   filenameFromContentDisposition,
+  filenameFromUrl,
   formatForFilename,
   formatForUrl,
   isAmbiguousDownloadUrl,
+  linkDownloadFormat,
+  safeFilename,
 } from "./detection-url";
 
 describe("formatForUrl", () => {
@@ -42,6 +45,83 @@ describe("formatForUrl", () => {
     expect(formatForUrl("https://example.com/")).toBeNull();
     expect(formatForUrl("not a url")).toBeNull();
     expect(formatForUrl("")).toBeNull();
+  });
+});
+
+describe("linkDownloadFormat", () => {
+  it("falls back to the path extension like formatForUrl", () => {
+    expect(linkDownloadFormat("https://example.com/route.gpx")).toBe("gpx");
+    expect(linkDownloadFormat("https://example.com/tour.kmz?dl=1")).toBe("kmz");
+    expect(linkDownloadFormat("https://example.com/photo.jpg")).toBeNull();
+  });
+
+  it("reads the format from a query param (MapMyFitness routes)", () => {
+    expect(
+      linkDownloadFormat(
+        "https://www.mapmyfitness.com/v7.2/route/1156937188/?format=gpx&field_set=detailed",
+      ),
+    ).toBe("gpx");
+    expect(
+      linkDownloadFormat(
+        "https://www.mapmyfitness.com/v7.2/route/1156937188/?format=kml&field_set=detailed",
+      ),
+    ).toBe("kml");
+  });
+
+  it("reads the format from a bare trailing path segment on an export path (MMF workout)", () => {
+    expect(
+      linkDownloadFormat(
+        "https://www.mapmyfitness.com/workout/export/1597560212/tcx",
+      ),
+    ).toBe("tcx");
+  });
+
+  it("reads the format from a mid-path segment on an export path (Polar Flow)", () => {
+    expect(
+      linkDownloadFormat(
+        "https://flow.polar.com/api/export/training/tcx/8357513887?compress=false",
+      ),
+    ).toBe("tcx");
+    expect(
+      linkDownloadFormat(
+        "https://flow.polar.com/api/export/training/fit/8357513887",
+      ),
+    ).toBe("fit");
+    expect(
+      linkDownloadFormat(
+        "https://flow.polar.com/api/export/training/gpx/8357513887?compress=false",
+      ),
+    ).toBe("gpx");
+  });
+
+  it("still resolves the Polar zip variant by format (content sniff filters it later)", () => {
+    // The zip link shares the TCX path; URL-level it looks like TCX. The dialog's
+    // same-origin matchesFormat check rejects the zip bytes, so no dialog shows.
+    expect(
+      linkDownloadFormat(
+        "https://flow.polar.com/api/export/training/tcx/8357513887?compress=true",
+      ),
+    ).toBe("tcx");
+  });
+
+  it("does not match non-GPS export segments like CSV", () => {
+    expect(
+      linkDownloadFormat(
+        "https://flow.polar.com/api/export/training/csv/8357513887?compress=false",
+      ),
+    ).toBeNull();
+  });
+
+  it("does not match format-named segments on non-download paths", () => {
+    expect(linkDownloadFormat("https://example.com/gpx/help")).toBeNull();
+    expect(
+      linkDownloadFormat("https://example.com/blog/tcx-explained"),
+    ).toBeNull();
+  });
+
+  it("returns null for unparseable input", () => {
+    expect(linkDownloadFormat("not a url")).toBeNull();
+    expect(linkDownloadFormat("")).toBeNull();
   });
 });
 
@@ -135,5 +215,62 @@ describe("isAmbiguousDownloadUrl", () => {
   it("returns false for unparseable input", () => {
     expect(isAmbiguousDownloadUrl("not a url")).toBe(false);
     expect(isAmbiguousDownloadUrl("")).toBe(false);
+  });
+});
+
+describe("filenameFromUrl", () => {
+  it("uses the URL's last path segment when it has a filename", () => {
+    expect(filenameFromUrl("https://example.com/a/route.gpx", "gpx")).toBe(
+      "route.gpx",
+    );
+  });
+
+  it("URL-decodes the segment", () => {
+    expect(filenameFromUrl("https://example.com/My%20Ride.tcx", "tcx")).toBe(
+      "My Ride.tcx",
+    );
+  });
+
+  it("ignores the query string", () => {
+    expect(
+      filenameFromUrl("https://example.com/route.gpx?token=abc", "gpx"),
+    ).toBe("route.gpx");
+  });
+
+  it("synthesizes download.<format> when the path has no filename", () => {
+    expect(filenameFromUrl("https://example.com/export", "kml")).toBe(
+      "download.kml",
+    );
+    expect(filenameFromUrl("https://example.com/", "fit")).toBe("download.fit");
+  });
+
+  it("synthesizes a name for unparseable input", () => {
+    expect(filenameFromUrl("not a url", "gpx")).toBe("download.gpx");
+  });
+});
+
+describe("safeFilename", () => {
+  it("keeps a normal filename intact", () => {
+    expect(safeFilename("My Ride.gpx")).toBe("My Ride.gpx");
+  });
+
+  it("strips path separators down to the basename", () => {
+    expect(safeFilename("../../etc/passwd.gpx")).toBe("passwd.gpx");
+    expect(safeFilename("a\\b\\c.kml")).toBe("c.kml");
+  });
+
+  it("neutralizes markup/shell characters", () => {
+    expect(safeFilename("<img src=x>.gpx")).toBe("_img src=x_.gpx");
+  });
+
+  it("falls back to 'download' when nothing usable remains", () => {
+    expect(safeFilename("/")).toBe("download");
+    expect(safeFilename("")).toBe("download");
+  });
+
+  it("caps absurdly long names", () => {
+    expect(safeFilename("a".repeat(500) + ".gpx").length).toBeLessThanOrEqual(
+      200,
+    );
   });
 });

@@ -3,23 +3,23 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>CTM Importer — detection test fixtures</title>
+    <title>Color The Map Importer — detection &amp; upload test fixtures</title>
     <style>
       body {
         font: 15px/1.5 system-ui, sans-serif;
-        max-width: 48rem;
+        max-width: 52rem;
         margin: 2rem auto;
         padding: 0 1rem;
       }
       section {
         border: 1px solid #ccc;
         border-radius: 8px;
-        padding: 1rem;
+        padding: 1rem 1.25rem;
         margin: 1rem 0;
       }
       h2 {
         margin-top: 0;
-        font-size: 1rem;
+        font-size: 1.05rem;
       }
       code {
         background: #f2f2f2;
@@ -28,10 +28,14 @@
       }
       button {
         font: inherit;
-        padding: 4px 10px;
+        padding: 3px 9px;
       }
       ul {
         margin: 0.5rem 0;
+        padding-left: 1.25rem;
+      }
+      li {
+        margin: 0.4rem 0;
       }
       .note {
         background: #fff8e1;
@@ -40,165 +44,257 @@
         padding: 0.5rem 0.75rem;
         font-size: 0.9rem;
       }
+      .expect {
+        background: #eef4ff;
+        border: 1px solid #c5d6f5;
+        border-radius: 6px;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.9rem;
+        margin: 0.25rem 0 0.75rem;
+      }
+      .muted {
+        color: #666;
+      }
     </style>
   </head>
   <body>
-    <h1>CTM Importer detection test fixtures</h1>
+    <h1>Color The Map Importer — test fixtures</h1>
     <p>
-      Load the unpacked extension, open the background service-worker console,
-      then work through each section. Serve this page over HTTP (e.g.
-      <code>npx http-server test-fixtures</code>).
+      Load the unpacked extension, sign in to Color The Map (toolbar icon →
+      Connect) with at least one map, then work through the sections below. Serve
+      this page over HTTP — e.g. <code>npx http-server test-fixtures</code>.
     </p>
-
     <p class="note">
-      <strong>Use real exports — not hand-made files.</strong> Drop genuine GPS
-      files exported from real services into <code>test-fixtures/files/</code>
-      using the names below. They are git-ignored on purpose: real exports carry
-      personal location data and must never be committed.
+      The sample files in <code>test-fixtures/files/</code> are committed to the
+      repo. <code>valid.gpx</code> is a real ride that starts and ends in a
+      public area (no sensitive location data); the other tracks are public
+      example files.
     </p>
+    <p>
+      Each sample offers up to three triggers:
+    </p>
+    <ul>
+      <li>
+        <strong>link</strong> — a normal anchor (Detector C). Clicking it lets
+        the browser download as usual <em>and</em> opens the Send-to-CTM dialog.
+        Detector C flags by <strong>file extension only</strong> — it never reads
+        the bytes.
+      </li>
+      <li>
+        <strong>fetch / XHR</strong> — fires the page's own request for the file
+        (Detector A), which intercepts the response and reads the bytes.
+        “<strong>+ save</strong>” also writes the file to disk, mimicking a real
+        “Export” button (the extension neither causes nor blocks that save).
+      </li>
+    </ul>
 
     <section>
-      <h2>Detectors C &amp; B — real files (drop into <code>files/</code>)</h2>
-      <p>
-        Expect a “Send to CTM” badge next to each link (Detector C). Clicking a
-        badge logs <code>[detector:C] … source=link</code>. Right-click → “Save
-        Link As” for Detector B (<code>source=download</code>, Chrome/Edge only).
+      <h2>Valid samples — should detect and import</h2>
+      <p class="expect">
+        <strong>Expect:</strong> every trigger opens the dialog. Pick a map (the
+        selector shows only when you have more than one) and <strong>Send</strong>
+        → the track appears in that Color The Map within a few seconds.
       </p>
-      <p class="note">
-        Detectors C and B flag candidates by <strong>extension/MIME only</strong>
-        — neither can read the file bytes here, so the file’s content is
-        confirmed (magic-byte sniff) later, at send time. Only Detector A
-        validates now, because it already holds the intercepted response body.
+      <ul id="valid-list"></ul>
+    </section>
+
+    <section>
+      <h2>Client-side rejects — content fails the extension's sniff</h2>
+      <p class="expect">
+        <strong>Expect:</strong> the <strong>fetch / XHR</strong> buttons open
+        <strong>no dialog</strong> — Detector A reads the bytes and rejects them
+        on content. The <strong>link</strong> still opens a dialog (Detector C
+        flags by extension only); on <strong>Send</strong>, the extension
+        re-reads the bytes, sees they aren't valid for that format, and
+        <strong>rejects locally</strong> — no upload, no round-trip to CTM.
       </p>
-      <ul>
-        <li><a href="./files/sample.gpx">files/sample.gpx</a></li>
-        <li><a href="./files/sample.fit">files/sample.fit</a></li>
-        <li><a href="./files/sample.tcx">files/sample.tcx</a></li>
-        <li><a href="./files/sample.kml">files/sample.kml</a></li>
-        <li><a href="./files/sample.kmz">files/sample.kmz</a></li>
-        <li>
-          Query-string variant:
-          <a href="./files/sample.gpx?token=abc123">files/sample.gpx?token=…</a>
-        </li>
-        <li>Control (no badge expected): <a href="./index.html">index.html</a></li>
-      </ul>
+      <ul id="client-list"></ul>
+    </section>
+
+    <section>
+      <h2>Server-side rejects — valid format, nothing to import</h2>
+      <p class="expect">
+        <strong>Expect:</strong> every trigger opens the dialog (the content
+        passes detection). On <strong>Send</strong>, Color The Map accepts the
+        upload but finds no track, so it returns an error the dialog surfaces
+        verbatim.
+      </p>
+      <ul id="server-list"></ul>
     </section>
 
     <section>
       <h2>Detector C — dynamically added link (MutationObserver)</h2>
-      <p>A badge should appear on the link the moment it is inserted.</p>
-      <button id="add-link">Add a GPX link via JS</button>
+      <p>
+        The inserted link should be wired the moment it appears — clicking it
+        opens the dialog for <code>valid.gpx</code>.
+      </p>
+      <button id="add-link">Add a valid.gpx link via JS</button>
       <div id="dynamic-target"></div>
     </section>
 
     <section>
-      <h2>Negative cases — content that isn’t GPS</h2>
+      <h2>Detector A — content-sniff edge cases (<code>negatives/</code>)</h2>
       <p>
-        Each file carries a GPS extension but holds non-GPS content. Because
-        Detector C and B don’t read the bytes, clicking a badge or saving the
-        link still logs <code>would send</code> (an unvalidated candidate — that
-        gets caught at send time). The <strong>fetch</strong> button next to each
-        exercises Detector A, which inspects the body and must log
-        <strong>nothing</strong>.
+        Extra bodies that look like GPS by URL but aren't. These exercise
+        Detector A's structural sniff specifically; the <strong>fetch / XHR</strong>
+        buttons must open <strong>no dialog</strong>.
       </p>
-      <ul>
-        <li>
-          <a href="./negatives/webpage.gpx">webpage.gpx</a>
-          <button data-fetch="./negatives/webpage.gpx">fetch</button> — an HTML
-          page named <code>.gpx</code>.
-        </li>
-        <li>
-          <a href="./negatives/styled-blob.gpx">styled-blob.gpx</a>
-          <button data-fetch="./negatives/styled-blob.gpx">fetch</button> — JSON
-          that <em>quotes</em> <code>&lt;gpx&gt;</code> text (GitHub
-          <code>/_styled</code> shape); the structural sniff must not be fooled.
-        </li>
-        <li>
-          <a href="./negatives/notes.tcx">notes.tcx</a>
-          <button data-fetch="./negatives/notes.tcx">fetch</button> — XML whose
-          root is <code>&lt;notes&gt;</code>, not TrainingCenterDatabase.
-        </li>
-        <li>
-          <a href="./negatives/empty.kml">empty.kml</a>
-          <button data-fetch="./negatives/empty.kml">fetch</button> — plain text
-          named <code>.kml</code>.
-        </li>
-        <li>
-          <a href="./negatives/fake.kmz">fake.kmz</a>
-          <button data-fetch="./negatives/fake.kmz">fetch</button> — plain text
-          named <code>.kmz</code> (no zip <code>PK</code> signature).
-        </li>
-      </ul>
+      <ul id="negatives-list"></ul>
     </section>
 
     <section>
-      <h2>Detector A — same-origin fetch / XHR (works locally)</h2>
+      <h2>Real-site verification</h2>
       <p>
-        Detector A wraps the page’s own <code>fetch</code>/XHR. These calls are
-        same-origin (this page → its own server), so the wrap sees them — no
-        CORS issue. Each logs <code>[detector:A] …</code> and does not save a
-        file, so Detector B stays quiet.
+        The local samples can't reproduce everything real sites do — cross-origin
+        requests, POST → bytes, custom content types, blob downloads. So also
+        verify against sites the extension doesn't control. Sign in to a service
+        like <strong>Strava</strong>, <strong>Polar Flow</strong>, or
+        <strong>MapMyFitness</strong>, open an activity or route, and
+        download/export it in each format the site offers (GPX, TCX, FIT, and
+        KML/KMZ where available). Confirm the “Send to Color The Map” dialog
+        appears for each download — i.e. the detectors actually catch the file as
+        it comes across.
       </p>
-      <ul>
-        <li>
-          <button data-fetch="./files/sample.gpx">fetch GPX (URL has extension)</button>
-          → <code>source=fetch</code>, classified by the URL.
-        </li>
-        <li>
-          <button data-xhr="./files/sample.tcx">XHR TCX</button>
-          → <code>source=xhr</code>.
-        </li>
-        <li>
-          <button data-fetch="./files/gpx-export-endpoint?token=abc">fetch GPX, no extension</button>
-          → <code>source=fetch</code>, forced down the <em>body-sniff</em> path
-          (ambiguous URL → XML-root sniff).
-        </li>
-        <li>
-          <button data-fetch="./files/fit-export-endpoint?token=abc">fetch FIT (binary), no extension</button>
-          → <code>source=fetch</code>, binary body-sniff (the <code>.FIT</code>
-          marker at offset 8).
-        </li>
-      </ul>
-      <p>
-        (Negative fetch cases — responses that look like GPS by URL but aren’t —
-        are in the “Negative cases” section below.)
-      </p>
-    </section>
-
-    <section>
-      <h2>Detector A — real-site sanity check (optional)</h2>
-      <p>
-        The local buttons above cover the mechanism. For real-world shapes the
-        local static server can’t reproduce (POST → bytes, custom content-types),
-        spot-check a real export:
-      </p>
-      <ul>
-        <li><strong>Komoot</strong> — open a tour → <em>Export GPX</em> → expect <code>source=fetch</code>.</li>
-        <li><strong>Strava</strong> — an activity’s <em>Export GPX</em> (<code>/activities/&lt;id&gt;/export_gpx</code>).</li>
-      </ul>
     </section>
 
     <script>
+      // Save bytes to disk the way a real export button does, so the "+ save"
+      // triggers mimic real sites.
+      function saveBlob(blob, filename) {
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = objectUrl;
+        a.download = filename;
+        document.body.append(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      }
+
+      function button(label, handler) {
+        const el = document.createElement("button");
+        el.type = "button";
+        el.textContent = label;
+        el.style.marginInlineStart = "6px";
+        el.addEventListener("click", handler);
+        return el;
+      }
+
+      function addRow(listId, path, description, save) {
+        const url = "./" + path;
+        const name = path.split("/").pop();
+        const li = document.createElement("li");
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.textContent = name;
+        li.append(a);
+
+        li.append(
+          button(save ? "fetch + save" : "fetch", async () => {
+            const response = await fetch(url);
+            if (save) saveBlob(await response.blob(), name);
+          }),
+        );
+        li.append(
+          button(save ? "XHR + save" : "XHR", () => {
+            const xhr = new XMLHttpRequest();
+            xhr.open("GET", url);
+            if (save) {
+              xhr.responseType = "arraybuffer";
+              xhr.addEventListener("load", () =>
+                saveBlob(new Blob([xhr.response]), name),
+              );
+            }
+            xhr.send();
+          }),
+        );
+
+        const span = document.createElement("span");
+        span.innerHTML = " — " + description;
+        li.append(span);
+
+        document.getElementById(listId).append(li);
+      }
+
+      const VALID = [
+        ["files/valid.gpx", "Komoot GPX with a real track."],
+        [
+          "files/valid.fit",
+          "Garmin FIT (binary); detected via the <code>.FIT</code> magic at offset 8.",
+        ],
+        ["files/valid.tcx", "Garmin TCX with trackpoints."],
+        ["files/valid.kml", "KML with a <code>LineString</code> track."],
+        [
+          "files/valid.kmz",
+          "KMZ (zipped KML); detected via the ZIP magic + <code>.kmz</code>.",
+        ],
+      ];
+      const CLIENT = [
+        ["files/client-reject.gpx", "HTML page named <code>.gpx</code>."],
+        [
+          "files/client-reject.tcx",
+          "XML rooted at <code>&lt;Activities&gt;</code>, not <code>&lt;TrainingCenterDatabase&gt;</code>.",
+        ],
+        [
+          "files/client-reject.kml",
+          "XML rooted at <code>&lt;Document&gt;</code>, missing the <code>&lt;kml&gt;</code> wrapper.",
+        ],
+        [
+          "files/client-reject.kmz",
+          "Plain text, not a ZIP (no <code>PK</code> signature).",
+        ],
+        [
+          "files/client-reject.fit",
+          "FIT-like header but the offset-8 magic is <code>.FIa</code>, not <code>.FIT</code>.",
+        ],
+      ];
+      const SERVER = [
+        ["files/server-reject.gpx", "Valid GPX, only a waypoint — no track."],
+        [
+          "files/server-reject.tcx",
+          "Valid TCX, lap summary only — no trackpoints.",
+        ],
+        [
+          "files/server-reject.kml",
+          "Valid KML, only Points (landmarks) — no <code>LineString</code>.",
+        ],
+        ["files/server-reject.kmz", "Valid KMZ, landmark points — no track."],
+        [
+          "files/server-reject.fit",
+          "Valid <code>.FIT</code> magic but a truncated body.",
+        ],
+      ];
+      const NEGATIVES = [
+        ["negatives/webpage.gpx", "An HTML page named <code>.gpx</code>."],
+        [
+          "negatives/styled-blob.gpx",
+          "JSON that <em>quotes</em> <code>&lt;gpx&gt;</code> text (GitHub <code>/_styled</code> shape); the structural sniff must not be fooled.",
+        ],
+        [
+          "negatives/notes.tcx",
+          "XML whose root is <code>&lt;notes&gt;</code>, not TrainingCenterDatabase.",
+        ],
+        ["negatives/empty.kml", "Plain text named <code>.kml</code>."],
+        [
+          "negatives/fake.kmz",
+          "Plain text named <code>.kmz</code> (no ZIP <code>PK</code> signature).",
+        ],
+      ];
+
+      VALID.forEach(([path, desc]) => addRow("valid-list", path, desc, true));
+      CLIENT.forEach(([path, desc]) => addRow("client-list", path, desc, true));
+      SERVER.forEach(([path, desc]) => addRow("server-list", path, desc, true));
+      NEGATIVES.forEach(([path, desc]) =>
+        addRow("negatives-list", path, desc, true),
+      );
+
       document.getElementById("add-link").addEventListener("click", () => {
         const a = document.createElement("a");
-        a.href = "./files/sample.kml";
-        a.textContent = "dynamically-added sample.kml";
+        a.href = "./files/valid.gpx";
+        a.textContent = "dynamically-added valid.gpx";
         document.getElementById("dynamic-target").append(a);
       });
-
-      for (const button of document.querySelectorAll("[data-fetch]")) {
-        button.addEventListener("click", async () => {
-          await fetch(button.getAttribute("data-fetch"));
-        });
-      }
-
-      for (const button of document.querySelectorAll("[data-xhr]")) {
-        button.addEventListener("click", () => {
-          const xhr = new XMLHttpRequest();
-          xhr.open("GET", button.getAttribute("data-xhr"));
-          xhr.send();
-        });
-      }
     </script>
   </body>
 </html>

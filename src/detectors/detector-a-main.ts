@@ -1,28 +1,98 @@
+import { bytesToBase64 } from "../shared/base64";
+import {
+  filenameFromContentDisposition,
+  filenameFromUrl,
+} from "../shared/detection-url";
+import type { GpsFormat } from "../shared/formats";
 import { isDetectionEnabledForHost } from "../shared/gate";
 import { classifyResponse } from "../shared/response-sniff";
-import { DETECTOR_A_MARKER, type DetectorAVia } from "./detector-a-protocol";
+import {
+  DETECTOR_A_MARKER,
+  type DetectorAMessage,
+  type DetectorAVia,
+} from "./detector-a-protocol";
 
-function report(format: string, via: DetectorAVia, url: string): void {
-  const message = { marker: DETECTOR_A_MARKER, format, via, url };
+// CTM's single-file cap. Bigger bodies aren't buffered for upload (the server
+// would reject them anyway); detection still reports so the URL can be tried.
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
+function report(
+  format: GpsFormat,
+  via: DetectorAVia,
+  url: string,
+  filename: string,
+  bytes: ArrayBuffer | null,
+): void {
+  const message: DetectorAMessage = {
+    marker: DETECTOR_A_MARKER,
+    format,
+    via,
+    url,
+    filename,
+  };
+  // Encode here, in the main world, so only a string crosses to the isolated
+  // bridge — an ArrayBuffer arrives page-realm in Firefox (instanceof fails).
+  if (bytes) {
+    message.bytesBase64 = bytesToBase64(bytes);
+  }
   window.postMessage(message, window.location.origin);
 }
 
-async function inspect(
-  via: DetectorAVia,
+function filenameFor(
   url: string,
-  contentType: string | undefined,
   contentDisposition: string | undefined,
-  body: ReadableStream<Uint8Array> | null,
-): Promise<void> {
-  const format = await classifyResponse({
-    url,
-    contentType,
-    contentDisposition,
-    body,
-  });
-  if (format) {
-    report(format, via, url);
+  format: GpsFormat,
+): string {
+  if (contentDisposition) {
+    const fromHeader = filenameFromContentDisposition(contentDisposition);
+    if (fromHeader) {
+      return fromHeader;
+    }
   }
+  return filenameFromUrl(url, format);
+}
+
+async function readCappedBytes(
+  response: Response,
+): Promise<ArrayBuffer | null> {
+  const len = Number(response.headers.get("content-length"));
+  if (Number.isFinite(len) && len > MAX_UPLOAD_BYTES) {
+    void response.body?.cancel();
+    return null;
+  }
+  // Stream and stop the moment we exceed the cap, so a response without a
+  // content-length header can't buffer an unbounded body into memory before the
+  // size check rejects it. (Runs in the main world, so typed arrays are safe.)
+  const body = response.body;
+  if (!body) {
+    const buffer = await response.arrayBuffer();
+    return buffer.byteLength <= MAX_UPLOAD_BYTES ? buffer : null;
+  }
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    if (!value) {
+      continue;
+    }
+    total += value.byteLength;
+    if (total > MAX_UPLOAD_BYTES) {
+      void reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return out.buffer;
 }
 
 function requestUrl(input: RequestInfo | URL): string {
@@ -40,14 +110,34 @@ function wrapFetch(): void {
   window.fetch = async function (...args) {
     const response = await originalFetch.apply(this, args);
     try {
-      const clone = response.clone();
-      await inspect(
-        "fetch",
-        response.url || requestUrl(args[0]),
-        response.headers.get("content-type") ?? undefined,
-        response.headers.get("content-disposition") ?? undefined,
-        clone.body,
-      );
+      // Two clones: one consumed (head only) to classify, one held back to
+      // buffer the full body — but only once the response is confirmed GPS, so
+      // non-GPS responses are never fully read.
+      const sniffClone = response.clone();
+      const bytesClone = response.clone();
+      const url = response.url || requestUrl(args[0]);
+      const contentType = response.headers.get("content-type") ?? undefined;
+      const contentDisposition =
+        response.headers.get("content-disposition") ?? undefined;
+
+      const format = await classifyResponse({
+        url,
+        contentType,
+        contentDisposition,
+        body: sniffClone.body,
+      });
+      if (!format) {
+        void bytesClone.body?.cancel();
+      } else {
+        const bytes = await readCappedBytes(bytesClone);
+        report(
+          format,
+          "fetch",
+          url,
+          filenameFor(url, contentDisposition, format),
+          bytes,
+        );
+      }
     } catch {
       // Sniffing must never break the page's own fetch.
     }
@@ -86,14 +176,33 @@ function wrapXhr(): void {
   } as typeof proto.send;
 }
 
+function safeHeader(xhr: XMLHttpRequest, name: string): string | undefined {
+  try {
+    return xhr.getResponseHeader(name) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function inspectXhr(xhr: TaggedXhr): Promise<void> {
   try {
-    await inspect(
+    const url = xhr.responseURL || xhr.__ctmUrl || "";
+    const contentType = safeHeader(xhr, "content-type");
+    // We don't read content-disposition here: getResponseHeader for it triggers
+    // "Refused to get unsafe header" on cross-origin XHRs (it's CORS-restricted),
+    // and it isn't needed — the URL/content-type gate plus the body sniff already
+    // identify the file. (The fetch path still uses it; Headers.get is silent.)
+    const body = xhrBody(xhr);
+    const format = await classifyResponse({ url, contentType, body });
+    if (!format) {
+      return;
+    }
+    report(
+      format,
       "xhr",
-      xhr.responseURL || xhr.__ctmUrl || "",
-      xhr.getResponseHeader("content-type") ?? undefined,
-      xhr.getResponseHeader("content-disposition") ?? undefined,
-      xhrBody(xhr),
+      url,
+      filenameFor(url, undefined, format),
+      xhrBytes(xhr),
     );
   } catch {
     // Best-effort.
@@ -113,6 +222,28 @@ function xhrBody(xhr: TaggedXhr): ReadableStream<Uint8Array> | null {
     default:
       return null;
   }
+}
+
+// A transferable copy of the loaded body — never the page's own buffer, which
+// transferring would detach. Blob/JSON/document types are skipped (the
+// background re-fetches the URL instead).
+function xhrBytes(xhr: TaggedXhr): ArrayBuffer | null {
+  let buffer: ArrayBuffer | null = null;
+  switch (xhr.responseType) {
+    case "":
+    case "text":
+      buffer = xhr.responseText
+        ? new TextEncoder().encode(xhr.responseText).buffer
+        : null;
+      break;
+    case "arraybuffer":
+      buffer =
+        xhr.response instanceof ArrayBuffer ? xhr.response.slice(0) : null;
+      break;
+    default:
+      buffer = null;
+  }
+  return buffer && buffer.byteLength <= MAX_UPLOAD_BYTES ? buffer : null;
 }
 
 export function initDetectorAMain(): void {

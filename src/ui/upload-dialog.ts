@@ -37,10 +37,24 @@ const HOST_URL_ATTR = "data-ctm-url";
 //
 // A cross-origin file can't be read here (CORS) → open and validate at Send.
 //
-// A same-origin read that *fails* is almost always the link click's navigation
-// aborting our in-flight fetch. We don't open in that case — Detector B catches
-// the resulting download and validates it without that race.
+// Firefox aborts an in-flight fetch when the link's own download starts in the
+// same tick (Chrome doesn't), so the first same-origin read can fail spuriously.
+// We retry once after the download has been dispatched — a fresh fetch then
+// succeeds. Only a genuine read failure falls through to Detector B.
 const inFlight = new Set<string>();
+
+// Long enough for the link's download to be dispatched (after which a new fetch
+// is no longer cancelled), short enough to keep the dialog feeling instant.
+const FETCH_RETRY_DELAY_MS = 150;
+
+function retryFetchBlob(rawUrl: string): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    setTimeout(
+      () => void fetchBlob(rawUrl).then(resolve),
+      FETCH_RETRY_DELAY_MS,
+    );
+  });
+}
 
 export async function requestUploadDialog(
   request: UploadDialogRequest,
@@ -63,11 +77,12 @@ export async function requestUploadDialog(
 
   inFlight.add(request.url);
   try {
-    const blob = await fetchBlob(request.url);
+    const blob =
+      (await fetchBlob(request.url)) ?? (await retryFetchBlob(request.url));
     if (!blob) {
-      // Same-origin read failed — almost certainly the click's navigation
-      // aborting our fetch. Defer to Detector B (the download), which validates
-      // without the race; opening here would skip validation.
+      // Couldn't read the file even after the retry — defer to Detector B (the
+      // download), which validates without the race; opening here would skip
+      // validation.
       return;
     }
     // Validate via the base64 string, not the blob's ArrayBuffer directly:

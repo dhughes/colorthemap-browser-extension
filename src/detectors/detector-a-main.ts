@@ -145,19 +145,24 @@ function wrapXhr(): void {
   } as typeof proto.send;
 }
 
+function safeHeader(xhr: XMLHttpRequest, name: string): string | undefined {
+  try {
+    return xhr.getResponseHeader(name) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function inspectXhr(xhr: TaggedXhr): Promise<void> {
   try {
     const url = xhr.responseURL || xhr.__ctmUrl || "";
-    const contentType = xhr.getResponseHeader("content-type") ?? undefined;
-    const contentDisposition =
-      xhr.getResponseHeader("content-disposition") ?? undefined;
-
-    const format = await classifyResponse({
-      url,
-      contentType,
-      contentDisposition,
-      body: xhrBody(xhr),
-    });
+    const contentType = safeHeader(xhr, "content-type");
+    // We don't read content-disposition here: getResponseHeader for it triggers
+    // "Refused to get unsafe header" on cross-origin XHRs (it's CORS-restricted),
+    // and it isn't needed — the URL/content-type gate plus the body sniff already
+    // identify the file. (The fetch path still uses it; Headers.get is silent.)
+    const body = xhrBody(xhr);
+    const format = await classifyResponse({ url, contentType, body });
     if (!format) {
       return;
     }
@@ -165,7 +170,7 @@ async function inspectXhr(xhr: TaggedXhr): Promise<void> {
       format,
       "xhr",
       url,
-      filenameFor(url, contentDisposition, format),
+      filenameFor(url, undefined, format),
       xhrBytes(xhr),
     );
   } catch {

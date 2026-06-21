@@ -111,6 +111,16 @@ function isSameOrigin(rawUrl: string): boolean {
   }
 }
 
+// The host for the permission-error message; falls back to the raw URL rather
+// than throwing on an unparseable one (the error path runs outside a try/catch).
+function hostOf(rawUrl: string): string {
+  try {
+    return new URL(rawUrl).host;
+  } catch {
+    return rawUrl;
+  }
+}
+
 // Reads a same-origin file from the content script — cookies included, no host
 // permission. Returns null on any failure (including a navigation-aborted fetch).
 async function fetchBlob(rawUrl: string): Promise<Blob | null> {
@@ -310,7 +320,7 @@ class UploadDialog {
       if (!blob && !(await this.ensureHostPermission())) {
         this.renderResult({
           tone: "error",
-          message: `Color The Map needs permission to read the file from ${new URL(this.request.url).host}.`,
+          message: `Color The Map needs permission to read the file from ${hostOf(this.request.url)}.`,
         });
         return;
       }

@@ -60,8 +60,39 @@ async function readCappedBytes(
     void response.body?.cancel();
     return null;
   }
-  const buffer = await response.arrayBuffer();
-  return buffer.byteLength <= MAX_UPLOAD_BYTES ? buffer : null;
+  // Stream and stop the moment we exceed the cap, so a response without a
+  // content-length header can't buffer an unbounded body into memory before the
+  // size check rejects it. (Runs in the main world, so typed arrays are safe.)
+  const body = response.body;
+  if (!body) {
+    const buffer = await response.arrayBuffer();
+    return buffer.byteLength <= MAX_UPLOAD_BYTES ? buffer : null;
+  }
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    if (!value) {
+      continue;
+    }
+    total += value.byteLength;
+    if (total > MAX_UPLOAD_BYTES) {
+      void reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return out.buffer;
 }
 
 function requestUrl(input: RequestInfo | URL): string {

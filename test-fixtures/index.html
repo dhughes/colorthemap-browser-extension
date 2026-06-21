@@ -104,8 +104,9 @@
         <strong>Expect:</strong> the <strong>fetch / XHR</strong> buttons open
         <strong>no dialog</strong> — Detector A reads the bytes and rejects them
         on content. The <strong>link</strong> still opens a dialog (Detector C
-        flags by extension only); on <strong>Send</strong>, Color The Map rejects
-        it and the dialog shows CTM's actual error.
+        flags by extension only); on <strong>Send</strong>, the extension
+        re-reads the bytes, sees they aren't valid for that format, and
+        <strong>rejects locally</strong> — no upload, no round-trip to CTM.
       </p>
       <ul id="client-list"></ul>
     </section>
@@ -282,10 +283,10 @@
       ];
 
       VALID.forEach(([path, desc]) => addRow("valid-list", path, desc, true));
-      CLIENT.forEach(([path, desc]) => addRow("client-list", path, desc, false));
-      SERVER.forEach(([path, desc]) => addRow("server-list", path, desc, false));
+      CLIENT.forEach(([path, desc]) => addRow("client-list", path, desc, true));
+      SERVER.forEach(([path, desc]) => addRow("server-list", path, desc, true));
       NEGATIVES.forEach(([path, desc]) =>
-        addRow("negatives-list", path, desc, false),
+        addRow("negatives-list", path, desc, true),
       );
 
       document.getElementById("add-link").addEventListener("click", () => {

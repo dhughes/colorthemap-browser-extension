@@ -10,8 +10,9 @@ import {
   formatDetectionLog,
   type DetectionMessage,
 } from "./shared/messages";
-import { initDetectorB } from "./detectors/detector-b";
+import { initDetectorB, type DownloadDetection } from "./detectors/detector-b";
 import { handleUploadMessage } from "./upload/handler";
+import { openDialogMessage } from "./upload/messages";
 
 console.log(aliveMessage("background"));
 
@@ -66,7 +67,35 @@ function handleDetection(message: DetectionMessage): void {
 }
 
 onDetection(handleDetection);
-initDetectorB((payload) => handleDetection(createDetectionMessage(payload)));
+
+// Detector B (the downloads API) runs in the background; the dialog is
+// content-script UI, so ask the active tab to open it. The download itself
+// proceeds normally — we only also offer to send it to Color The Map.
+async function openDownloadDialog(detection: DownloadDetection): Promise<void> {
+  try {
+    const [tab] = await browser.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
+    if (tab?.id != null) {
+      await browser.tabs.sendMessage(tab.id, openDialogMessage(detection));
+    }
+  } catch {
+    // No active tab or no content script there — nothing to open.
+  }
+}
+
+initDetectorB((detection) => {
+  handleDetection(
+    createDetectionMessage({
+      detector: "B",
+      format: detection.format,
+      source: "download",
+      url: detection.url,
+    }),
+  );
+  void openDownloadDialog(detection);
+});
 
 // onStartup only fires on browser launch; an evicted MV3 SW re-spun by any
 // event also needs the proactive check, so run it on every SW evaluation

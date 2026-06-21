@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   UPLOAD_MESSAGE_TYPES,
   isListMapsMessage,
+  isOpenDialogMessage,
   isUploadMessage,
   listMapsMessage,
+  openDialogMessage,
   uploadMessage,
 } from "./messages";
 
@@ -100,5 +102,39 @@ describe("isUploadMessage", () => {
   it("rejects the wrong type and non-objects", () => {
     expect(isUploadMessage({ ...valid, type: "other" })).toBe(false);
     expect(isUploadMessage(undefined)).toBe(false);
+  });
+});
+
+describe("openDialogMessage", () => {
+  const params = {
+    url: "https://example.com/route?format=gpx",
+    filename: "route.gpx",
+    format: "gpx" as const,
+  };
+
+  it("stamps the discriminant type and carries the payload", () => {
+    expect(openDialogMessage(params)).toEqual({
+      type: UPLOAD_MESSAGE_TYPES.openDialog,
+      ...params,
+    });
+  });
+});
+
+describe("isOpenDialogMessage", () => {
+  const valid = openDialogMessage({
+    url: "https://example.com/route?format=gpx",
+    filename: "route.gpx",
+    format: "gpx",
+  });
+
+  it("accepts a well-formed open-dialog message", () => {
+    expect(isOpenDialogMessage(valid)).toBe(true);
+  });
+
+  it("rejects an unknown format, non-http url, or wrong type", () => {
+    expect(isOpenDialogMessage({ ...valid, format: "zip" })).toBe(false);
+    expect(isOpenDialogMessage({ ...valid, url: "file:///x.gpx" })).toBe(false);
+    expect(isOpenDialogMessage({ ...valid, type: "other" })).toBe(false);
+    expect(isOpenDialogMessage(null)).toBe(false);
   });
 });

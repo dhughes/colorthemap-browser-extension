@@ -25,11 +25,19 @@ export interface UploadDialogRequest {
   bytesBase64?: string;
 }
 
+const HOST_URL_ATTR = "data-ctm-url";
+
 // Opens the "Send to Color The Map" dialog for one detected file. A DOM-level
-// singleton: any open dialog is replaced, so Detectors A and C (separate
-// content-script bundles) never stack two.
+// singleton (works across the separate content-script bundles): if a dialog is
+// already open for the SAME file it's left alone — this dedupes a Detector C
+// link click against the Detector B download it triggers. A different file
+// replaces whatever's open.
 export function openUploadDialog(request: UploadDialogRequest): void {
-  document.querySelector(HOST_TAG)?.remove();
+  const existing = document.querySelector(HOST_TAG);
+  if (existing?.getAttribute(HOST_URL_ATTR) === request.url) {
+    return;
+  }
+  existing?.remove();
   new UploadDialog(request).mount();
 }
 
@@ -44,6 +52,12 @@ class UploadDialog {
 
   constructor(private readonly request: UploadDialogRequest) {
     this.host = document.createElement(HOST_TAG);
+    this.host.setAttribute(HOST_URL_ATTR, request.url);
+    // The dialog is injected into arbitrary pages and must sit above their own
+    // modals. Pin the host to a max-z-index fixed layer (with !important to beat
+    // aggressive site CSS); appended last in the DOM, it also wins z-index ties.
+    this.host.style.cssText =
+      "position: fixed !important; inset: 0 !important; z-index: 2147483647 !important;";
     this.shadow = this.host.attachShadow({ mode: "open" });
 
     const style = document.createElement("style");

@@ -3,131 +3,68 @@
   <head>
     <meta charset="utf-8" />
     <title>Color The Map Importer</title>
-    <link rel="stylesheet" href="./styles/design-system.css" />
-    <style>
-      body {
-        font-family: var(--font-sans);
-        background: var(--color-bg);
-        color: var(--color-text);
-        margin: 0;
-        padding: var(--space-4xl) var(--space-lg);
-        line-height: var(--leading-normal);
-      }
-      .wrap {
-        max-width: 30rem;
-        margin: 0 auto;
-      }
-      .brand {
-        display: flex;
-        align-items: center;
-        gap: var(--space-md);
-        margin-bottom: var(--space-2xl);
-      }
-      .brand img {
-        width: 48px;
-        height: 48px;
-        flex: none;
-      }
-      .brand h1 {
-        font-size: var(--text-xl);
-        font-weight: var(--font-weight-semibold);
-        letter-spacing: var(--tracking-tight);
-        margin: 0;
-      }
-      .brand p {
-        font-size: var(--text-sm);
-        color: var(--color-text-muted);
-        margin: 2px 0 0;
-      }
-      h2 {
-        font-size: var(--text-sm);
-        text-transform: uppercase;
-        letter-spacing: var(--tracking-wide);
-        color: var(--color-text-muted);
-        margin: var(--space-2xl) 0 var(--space-md);
-      }
-      .intro {
-        color: var(--color-text-muted);
-        margin: 0 0 var(--space-xl);
-      }
-      .signup {
-        display: inline-block;
-        margin-top: var(--space-xl);
-        font-size: var(--text-sm);
-        color: var(--color-primary);
-        text-decoration: none;
-      }
-      .signup:hover {
-        text-decoration: underline;
-      }
-      .account {
-        display: flex;
-        align-items: center;
-        gap: var(--space-lg);
-        margin-bottom: var(--space-lg);
-      }
-      .avatar {
-        width: 48px;
-        height: 48px;
-        border-radius: var(--radius-full);
-        object-fit: cover;
-        background: var(--color-fill);
-        flex: none;
-      }
-      .email {
-        font-weight: var(--font-weight-semibold);
-        word-break: break-all;
-      }
-      .status-connected {
-        font-size: var(--text-sm);
-        color: var(--color-success);
-      }
-      .placeholder {
-        color: var(--color-text-muted);
-      }
-      [hidden] {
-        display: none !important;
-      }
-    </style>
+    <link rel="stylesheet" href="./styles/foundation.css" />
   </head>
-  <body>
-    <div class="wrap">
-      <header class="brand">
-        <img src="./logo.svg" alt="Color The Map" />
+  <body
+    class="bg-light-gray-500 px-6 py-16 font-system text-body leading-normal text-text"
+  >
+    <div class="mx-auto max-w-[30rem]">
+      <header class="mb-8 flex items-center gap-3">
+        <img src="./logo.svg" alt="Color The Map" class="size-12 shrink-0" />
         <div>
-          <h1>Color The Map Importer</h1>
-          <p>Send the GPS files you download straight to Color The Map.</p>
+          <h1 class="text-title font-semibold tracking-tight">
+            Color The Map Importer
+          </h1>
+          <p class="mt-0.5 text-secondary text-text-muted">
+            Send the GPS files you download straight to Color The Map.
+          </p>
         </div>
       </header>
 
-      <p id="auth-error" class="alert alert-error" role="alert" hidden></p>
+      <p id="auth-error" role="alert" hidden></p>
 
       <section id="logged-out" hidden>
-        <p class="intro">
+        <p class="mb-6 text-text-muted">
           Welcome! Connect your Color The Map account to start importing the GPS
           files you download.
         </p>
-        <button id="connect" class="btn btn-primary btn-lg btn-block">
-          Connect to Color The Map
-        </button>
-        <a id="signup" class="signup" href="#" target="_blank" rel="noopener">
+        <button id="connect">Connect to Color The Map</button>
+        <a
+          id="signup"
+          class="mt-6 inline-block text-secondary text-magenta-700 hover:underline"
+          href="#"
+          target="_blank"
+          rel="noopener"
+        >
           Don't have an account? Sign up at colorthemap.app
         </a>
       </section>
 
       <section id="logged-in" hidden>
-        <h2>Account</h2>
-        <div class="account">
-          <img id="avatar" class="avatar" alt="" />
+        <h2
+          class="mt-8 mb-3 text-micro font-semibold tracking-micro uppercase text-text-muted"
+        >
+          Account
+        </h2>
+        <div class="mb-4 flex items-center gap-4">
+          <img
+            id="avatar"
+            class="size-12 shrink-0 rounded-full bg-fill object-cover"
+            alt=""
+          />
           <div>
-            <div id="email" class="email"></div>
-            <div class="status-connected">Connected</div>
+            <div id="email" class="font-semibold break-all"></div>
+            <div class="text-secondary text-alert-success">Connected</div>
           </div>
         </div>
-        <button id="disconnect" class="btn btn-destructive">Disconnect</button>
+        <button id="disconnect">Disconnect</button>
 
-        <h2>Settings</h2>
-        <p class="placeholder">
+        <h2
+          class="mt-8 mb-3 text-micro font-semibold tracking-micro uppercase text-text-muted"
+        >
+          Settings
+        </h2>
+        <p class="text-text-muted">
           Per-site import preferences will live here in a later release.
         </p>
       </section>

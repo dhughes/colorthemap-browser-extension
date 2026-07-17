@@ -44,6 +44,11 @@ jobs:
         continue-on-error: true
         run: npm test
 
+      - name: Generated theme present + parseable
+        id: theme
+        continue-on-error: true
+        run: npm run validate:theme
+
       - name: Build
         id: build
         continue-on-error: true
@@ -72,13 +77,14 @@ jobs:
           if-no-files-found: warn
 
       - name: Check for failures
-        if: steps.lint.outcome == 'failure' || steps.format.outcome == 'failure' || steps.typecheck.outcome == 'failure' || steps.test.outcome == 'failure' || steps.build.outcome == 'failure' || steps.package.outcome == 'failure' || steps.audit.outcome == 'failure'
+        if: steps.lint.outcome == 'failure' || steps.format.outcome == 'failure' || steps.typecheck.outcome == 'failure' || steps.test.outcome == 'failure' || steps.theme.outcome == 'failure' || steps.build.outcome == 'failure' || steps.package.outcome == 'failure' || steps.audit.outcome == 'failure'
         run: |
           echo "One or more checks failed:"
           echo "  ESLint: ${{ steps.lint.outcome }}"
           echo "  Prettier: ${{ steps.format.outcome }}"
           echo "  TypeScript: ${{ steps.typecheck.outcome }}"
           echo "  Tests: ${{ steps.test.outcome }}"
+          echo "  Generated theme: ${{ steps.theme.outcome }}"
           echo "  Build: ${{ steps.build.outcome }}"
           echo "  Package: ${{ steps.package.outcome }}"
           echo "  Audit: ${{ steps.audit.outcome }}"

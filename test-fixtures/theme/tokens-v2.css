@@ -1,0 +1,54 @@
+/* UI Redesign v2 design tokens — structural fixture mirroring CTM's
+   tokens-v2.css: a leading @import, one top-level :root block mixing
+   extension-relevant tokens with CTM-shell-only geometry, and a @media
+   re-bind block whose nested :root must be ignored. */
+@import "./tokens-ladder.generated.css";
+
+:root {
+  /* Scrim blur — pairs with --shell-color-scrim. */
+  --backdrop-scrim: blur(3px);
+
+  /* Radii — the v2 quartet. */
+  --radius-control: 0.625rem;
+  --radius-card: 0.875rem;
+  --radius-surface: 1.25rem;
+  --radius-pill: 9999px;
+
+  /* Typography — families. */
+  --font-display:
+    "Bricolage Grotesque", -apple-system, "SF Pro Display", "Segoe UI",
+    sans-serif;
+  --font-system:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Typography — the v2 size scale. */
+  --text-micro: 0.6875rem;
+  --text-secondary: 0.8125rem;
+  --text-body: 0.9375rem;
+  --text-input: 1rem;
+  --text-title: 1.0625rem;
+  --tracking-micro: 0.06em;
+
+  /* Motion. */
+  --transition-chrome: 0.2s ease-out;
+  --ease-detent: cubic-bezier(0.32, 0.72, 0.28, 1);
+
+  /* Layout — shell-only geometry the extension must not adopt. */
+  --shell-inset: 12px;
+  --shell-inset-top: calc(var(--shell-inset) + env(safe-area-inset-top));
+  --touch-target: 44px;
+  --size-fab: 58px;
+
+  /* Modal dialog geometry. */
+  --dialog-w-card: 20rem;
+  --dialog-w-panel: 35rem;
+  --dialog-max-h: 84dvh;
+  --dialog-safe-top: calc(1rem + env(safe-area-inset-top, 0px));
+}
+
+/* At or above the shell breakpoint the edge insets widen. */
+@media (width >= 43.75rem) {
+  :root {
+    --shell-inset: 24px;
+  }
+}

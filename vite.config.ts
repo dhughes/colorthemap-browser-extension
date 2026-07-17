@@ -1,3 +1,4 @@
+import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import webExtension, { readJsonFile } from "vite-plugin-web-extension";
 import { resolve } from "node:path";
@@ -72,6 +73,9 @@ export default defineConfig({
     target: "es2022",
   },
   plugins: [
+    // Applies inside the plugin's per-entry child builds too (they load this
+    // config file), so ?inline CSS in content scripts compiles as well.
+    tailwindcss(),
     webExtension({
       manifest: generateManifest,
       // web-ext only knows 'firefox' vs Chromium; Edge validates as Chromium.

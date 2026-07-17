@@ -1,0 +1,19 @@
+/* The stylesheet for content-script shadow roots (the upload dialog today,
+   the #21 action toast next). Imported with `?inline`, so the compiled text
+   ships inside the content bundle and is injected as a <style> element —
+   shadow roots on third-party pages can't load extension stylesheets.
+
+   :host pins the inheritable text properties that would otherwise leak in
+   from the host page. Surfaces are light by default (:host carries the light
+   token scope in theme.generated.css); a dark surface opts in by wearing
+   .surface-dark-solid. Known pre-existing limitation: rem units resolve
+   against the HOST page's root font-size, so pages with a rescaled html
+   font-size scale our type/spacing with them. */
+@import "./foundation.css";
+
+:host {
+  font-family: var(--font-system);
+  font-size: var(--text-body);
+  line-height: 1.5;
+  color: var(--color-text);
+}

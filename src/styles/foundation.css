@@ -2,7 +2,12 @@
    `base` layer as the normalization floor (border-* utilities assume its
    `border: 0 solid` reset). theme.generated.css is imported UNLAYERED so its
    token declarations always beat the layered theme copies Tailwind emits for
-   the mapped keys — unlayered wins over layered. */
+   the mapped keys — unlayered wins over layered.
+
+   Motion convention: declarative CSS animations gate themselves with a
+   `@media (prefers-reduced-motion: reduce)` block (see the toast keyframes in
+   shadow.css); JS-driven animations must check prefersReducedMotion() in code,
+   since the media query never disables scripted animation. */
 @layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/preflight.css" layer(base);

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   alertClass,
   buttonClass,
+  formatBadgeClass,
   selectClass,
   surfaceCardClass,
 } from "./recipes";
@@ -62,5 +63,13 @@ describe("surfaceCardClass", () => {
     expect(surfaceCardClass("dark")).toBe(
       "surface-dark-solid rounded-card shadow-raised",
     );
+  });
+});
+
+describe("formatBadgeClass", () => {
+  it("is a compact uppercase pill on the muted ladder", () => {
+    expect(formatBadgeClass).toContain("rounded-pill");
+    expect(formatBadgeClass).toContain("uppercase");
+    expect(formatBadgeClass).toContain("text-micro");
   });
 });

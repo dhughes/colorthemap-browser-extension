@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fetchFileBytes, uploadTrack } from "./service";
+import { UploadNetworkError, UploadServerError } from "./errors";
+import { fetchFileBytes, uploadTracks } from "./service";
 
 const BASE = "https://dev.colorthemap.app";
 
@@ -20,6 +21,9 @@ const batch = (over: Partial<Record<string, unknown>> = {}) => ({
   ...over,
 });
 
+const bytes = (text: string): ArrayBuffer =>
+  new TextEncoder().encode(text).buffer;
+
 let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
@@ -29,19 +33,19 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("uploadTrack", () => {
-  const bytes = new TextEncoder().encode("<gpx></gpx>").buffer;
-
-  it("POSTs multipart to the map's tracks endpoint with the file and bearer", async () => {
+describe("uploadTracks", () => {
+  it("POSTs one multipart request carrying every file under the same key", async () => {
     fetchMock.mockResolvedValue(
-      jsonResponse(batch({ uploaded: 1, track_ids: [99] })),
+      jsonResponse(batch({ uploaded: 2, track_ids: [98, 99] })),
     );
 
-    const result = await uploadTrack({
+    const result = await uploadTracks({
       accessToken: "access-xyz",
       mapId: 42,
-      filename: "route.gpx",
-      bytes,
+      files: [
+        { filename: "ride.gpx", bytes: bytes("<gpx/>") },
+        { filename: "walk.kml", bytes: bytes("<kml/>") },
+      ],
       baseUrl: BASE,
     });
 
@@ -49,103 +53,108 @@ describe("uploadTrack", () => {
     expect(url).toBe(`${BASE}/api/v1/maps/42/tracks`);
     expect(init.method).toBe("POST");
     expect(init.headers.Authorization).toBe("Bearer access-xyz");
-    expect(init.body).toBeInstanceOf(FormData);
-    const file = (init.body as FormData).get("files") as File;
-    expect(file.name).toBe("route.gpx");
-    expect(result).toEqual({ status: "ok" });
+    const files = (init.body as FormData).getAll("files") as File[];
+    expect(files.map((f) => f.name)).toEqual(["ride.gpx", "walk.kml"]);
+    expect(result).toEqual({
+      uploaded: 2,
+      duplicates: 0,
+      failed: 0,
+      errors: [],
+    });
   });
 
-  it("sanitizes the filename before sending it to CTM", async () => {
-    fetchMock.mockResolvedValue(jsonResponse(batch({ uploaded: 1 })));
+  it("sanitizes every filename before sending it to CTM", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(batch({ uploaded: 2 })));
 
-    await uploadTrack({
+    await uploadTracks({
       accessToken: "t",
       mapId: 1,
-      filename: "../../etc/<evil>.gpx",
-      bytes,
+      files: [
+        { filename: "../../etc/<evil>.gpx", bytes: bytes("<gpx/>") },
+        { filename: "fine.gpx", bytes: bytes("<gpx/>") },
+      ],
       baseUrl: BASE,
     });
 
     const [, init] = fetchMock.mock.calls[0]!;
-    const file = (init.body as FormData).get("files") as File;
-    expect(file.name).toBe("_evil_.gpx");
+    const files = (init.body as FormData).getAll("files") as File[];
+    expect(files.map((f) => f.name)).toEqual(["_evil_.gpx", "fine.gpx"]);
   });
 
-  it("surfaces CTM's parse error verbatim when the file fails to import", async () => {
+  it("keeps CTM's per-file error lines verbatim in the counts", async () => {
     const reason =
       "route.kml: Unsupported file type (use .gpx, .csv, .fit, .fit.gz, .tcx, .kml, or .kmz)";
     fetchMock.mockResolvedValue(
-      jsonResponse(batch({ failed: 1, errors: [reason] })),
+      jsonResponse(batch({ uploaded: 1, failed: 1, errors: [reason] })),
     );
 
-    const result = await uploadTrack({
+    const result = await uploadTracks({
       accessToken: "t",
       mapId: 1,
-      filename: "route.kml",
-      bytes,
+      files: [
+        { filename: "ride.gpx", bytes: bytes("<gpx/>") },
+        { filename: "route.kml", bytes: bytes("<kml/>") },
+      ],
       baseUrl: BASE,
     });
 
-    expect(result).toEqual({ status: "error", detail: reason });
-  });
-
-  it("treats failed > 0 as an error even when CTM sends no error strings", async () => {
-    fetchMock.mockResolvedValue(jsonResponse(batch({ failed: 1, errors: [] })));
-
-    const result = await uploadTrack({
-      accessToken: "t",
-      mapId: 1,
-      filename: "route.gpx",
-      bytes,
-      baseUrl: BASE,
+    expect(result).toEqual({
+      uploaded: 1,
+      duplicates: 0,
+      failed: 1,
+      errors: [reason],
     });
-
-    expect(result.status).toBe("error");
-    expect(result.detail).toBeTruthy();
   });
 
-  it("does not claim success when nothing was uploaded, failed, or duplicated", async () => {
-    fetchMock.mockResolvedValue(jsonResponse(batch()));
-
-    const result = await uploadTrack({
-      accessToken: "t",
-      mapId: 1,
-      filename: "route.gpx",
-      bytes,
-      baseUrl: BASE,
-    });
-
-    expect(result.status).toBe("error");
-  });
-
-  it("reports a duplicate when CTM already has the track", async () => {
+  it("counts same-source and cross-source duplicates together", async () => {
     fetchMock.mockResolvedValue(
-      jsonResponse(batch({ duplicates: ["route.gpx"] })),
+      jsonResponse(
+        batch({
+          duplicates: ["ride.gpx"],
+          cross_source_duplicates: ["walk.kml"],
+        }),
+      ),
     );
 
-    const result = await uploadTrack({
+    const result = await uploadTracks({
       accessToken: "t",
       mapId: 1,
-      filename: "route.gpx",
-      bytes,
+      files: [
+        { filename: "ride.gpx", bytes: bytes("<gpx/>") },
+        { filename: "walk.kml", bytes: bytes("<kml/>") },
+      ],
       baseUrl: BASE,
     });
 
-    expect(result.status).toBe("duplicate");
+    expect(result.duplicates).toBe(2);
   });
 
-  it("surfaces CTM's detail on a non-OK response (e.g. foreign map)", async () => {
+  it("throws a typed server error carrying CTM's detail on a non-OK response", async () => {
     fetchMock.mockResolvedValue(jsonResponse({ detail: "Map not found" }, 404));
 
-    const result = await uploadTrack({
+    const error = await uploadTracks({
       accessToken: "t",
       mapId: 999,
-      filename: "route.gpx",
-      bytes,
+      files: [{ filename: "ride.gpx", bytes: bytes("<gpx/>") }],
       baseUrl: BASE,
-    });
+    }).catch((e: unknown) => e);
 
-    expect(result).toEqual({ status: "error", detail: "Map not found" });
+    expect(error).toBeInstanceOf(UploadServerError);
+    expect((error as UploadServerError).status).toBe(404);
+    expect((error as UploadServerError).message).toBe("Map not found");
+  });
+
+  it("throws a typed network error when the request never reaches CTM", async () => {
+    fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
+
+    const error = await uploadTracks({
+      accessToken: "t",
+      mapId: 1,
+      files: [{ filename: "ride.gpx", bytes: bytes("<gpx/>") }],
+      baseUrl: BASE,
+    }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(UploadNetworkError);
   });
 });
 
@@ -161,7 +170,7 @@ describe("fetchFileBytes", () => {
     expect(new TextDecoder().decode(buffer)).toBe("<gpx></gpx>");
   });
 
-  it("throws CTM's message when the file fetch fails", async () => {
+  it("throws the site's message when the file fetch fails", async () => {
     fetchMock.mockResolvedValue(new Response("nope", { status: 403 }));
     await expect(
       fetchFileBytes("https://example.com/route.gpx"),

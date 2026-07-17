@@ -1,6 +1,6 @@
 import { filenameFromUrl, linkDownloadFormat } from "../shared/detection-url";
 import { isDetectionEnabledForHost } from "../shared/gate";
-import { requestUploadDialog } from "../ui/upload-dialog";
+import { requestUploadToast } from "../ui/upload-toast";
 
 // Anchors we've already wired, so MutationObserver re-runs are no-ops.
 const handled = new WeakSet<HTMLAnchorElement>();
@@ -18,14 +18,13 @@ function evaluateLink(link: HTMLAnchorElement): void {
   // No preventDefault: the browser's normal download still proceeds. We only
   // *also* offer to send the file to CTM. Detector C flags by URL only (path
   // extension, a ?format= param, or an export-path segment); the bytes are
-  // confirmed at send — for a same-origin link the dialog sniffs them first, so
+  // confirmed at send — for a same-origin link the toast sniffs them first, so
   // a URL-level false positive never reaches CTM.
   link.addEventListener("click", () => {
-    void requestUploadDialog({
+    void requestUploadToast({
       url: link.href,
       filename: filenameFromUrl(link.href, format),
       format,
-      sourceHostname: location.hostname,
     });
   });
 }

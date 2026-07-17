@@ -17,3 +17,64 @@
   line-height: 1.5;
   color: var(--color-text);
 }
+
+/* ─── #21 action toast ──────────────────────────────────────────────────────
+   Enter/exit motion and the auto-dismiss bar. Scoped here (not foundation.css)
+   because only content-script shadow surfaces use them. CTM's chrome/detent
+   motion tokens drive the timing. Reduced-motion neutralizes the slide; the
+   card still appears and dismisses, just without travel. */
+
+@keyframes ctm-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ctm-toast-leave {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+}
+
+.ctm-toast-enter {
+  animation: ctm-toast-enter var(--duration-detent) var(--ease-detent) both;
+}
+
+.ctm-toast-leave {
+  animation: ctm-toast-leave var(--transition-chrome) both;
+}
+
+/* The auto-dismiss countdown: a thin bar overlaying the header's bottom border,
+   so toggling it never shifts layout. It drains as time runs out — the
+   controller sets scaleX from the remaining fraction each frame (origin left,
+   so the trailing edge recedes leftward). Fades out when the user engages. */
+.ctm-toast-bar {
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: 2px;
+  transform-origin: left center;
+  background-color: var(--color-gps-accent);
+  transition: opacity var(--transition-chrome);
+}
+
+.ctm-toast-bar.is-hidden {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ctm-toast-enter,
+  .ctm-toast-leave {
+    animation: none;
+  }
+}

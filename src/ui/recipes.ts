@@ -65,10 +65,10 @@ export function buttonClass(options: ButtonClassOptions = {}): string {
   return classes.join(" ");
 }
 
-// Compact icon-only control (the dialog/toast close ✕): fill-flash hover,
-// hit-target-padded to the 44pt floor.
+// The header ✕ (CTM's CloseButton "header" variant): round hit area, faint ink
+// glyph, fill-flash hover, hit-target-padded to the 44pt floor.
 export const closeButtonClass =
-  "hit-target flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-control text-text-muted transition hover:bg-fill hover:text-text";
+  "hit-target flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-text-muted transition hover:bg-fill hover:text-text";
 
 export type AlertTone = "success" | "error" | "warning" | "info";
 
@@ -97,11 +97,18 @@ export const selectClass = `${inputClass} cursor-pointer`;
 
 export const labelClass = "text-secondary font-semibold text-text";
 
+// A compact uppercase pill for a file's detected format (GPX / FIT / …): the
+// micro type on a fill-tinted rounded chip. Polarity-aware via the ladder, so
+// it reads correctly on the #21 toast's dark surface.
+export const formatBadgeClass =
+  "inline-flex items-center rounded-pill bg-fill px-2 py-0.5 text-micro font-semibold uppercase tracking-micro text-text-muted";
+
 export const spinnerClass =
   "size-4 shrink-0 animate-spin rounded-full border-2 border-border border-t-text";
 
 // An elevated card face; the polarity class scopes the whole token ladder for
-// everything inside it (the #21 toast is the dark consumer).
+// everything inside it. Light is CTM's card/popover/menu face (#fff); dark ink
+// is reserved for the selection bar. The #21 toast is a light card.
 export function surfaceCardClass(polarity: "light" | "dark"): string {
   const surface =
     polarity === "light" ? "surface-light-solid" : "surface-dark-solid";

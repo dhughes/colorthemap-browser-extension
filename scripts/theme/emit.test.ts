@@ -76,11 +76,18 @@ describe("buildV2TokensSection", () => {
     );
   });
 
+  it("emits the motion tokens (#21 toast)", () => {
+    expect(section).toContain("--transition-chrome: 0.2s ease-out;");
+    expect(section).toContain("--duration-detent: 360ms;");
+    expect(section).toContain(
+      "--ease-detent: cubic-bezier(0.32, 0.72, 0.28, 1);",
+    );
+  });
+
   it("excludes tokens outside the allowlist", () => {
     expect(section).not.toContain("--font-display");
     expect(section).not.toContain("--shell-inset");
     expect(section).not.toContain("--size-fab");
-    expect(section).not.toContain("--transition-chrome");
     expect(section).not.toContain("--dialog-safe-top");
   });
 
@@ -115,6 +122,14 @@ describe("buildThemeSection", () => {
     expect(section).toContain("--tracking-micro: var(--tracking-micro);");
     expect(section).not.toContain("--backdrop-scrim: var(--backdrop-scrim);");
     expect(section).not.toContain("--touch-target: var(--touch-target);");
+  });
+
+  it("maps ease-detent but keeps the other motion tokens var()-only", () => {
+    expect(section).toContain("--ease-detent: var(--ease-detent);");
+    expect(section).not.toContain(
+      "--transition-chrome: var(--transition-chrome);",
+    );
+    expect(section).not.toContain("--duration-detent: var(--duration-detent);");
   });
 
   it("maps the scrim rename and the policy theme keys", () => {

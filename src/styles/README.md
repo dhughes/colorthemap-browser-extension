@@ -16,5 +16,6 @@ sources. Nothing here is hand-copied from CTM.
   with `?inline` by content-script surfaces and injected into their shadow
   roots (the compiled text ships inside the content bundle).
 
-Surfaces are light by default; a dark surface (the #21 toast) opts in with
-`surface-dark-solid`. Reusable component looks live in `src/ui/recipes.ts`.
+Surfaces are light by default (CTM's card/popover/menu face); a dark surface
+opts in with `surface-dark-solid` (CTM reserves ink for the selection bar).
+Reusable component looks live in `src/ui/recipes.ts`.

@@ -11,6 +11,7 @@ In progress. Landed so far: the MV3 shell + build pipeline, the GPS **detection*
 ## Stack
 
 - TypeScript + Vite, built with [`vite-plugin-web-extension`](https://github.com/aklinker1/vite-plugin-web-extension)
+- Tailwind v4 on design tokens generated from Color The Map's canonical sources (see `src/styles/README.md`)
 - Vitest for unit tests
 - `webextension-polyfill` so the same source builds against Chrome, Edge, and Firefox
 - Single `manifest.base.json`; `vite.config.ts` builds it per-browser into `dist/{chrome,edge,firefox}/`
@@ -28,11 +29,11 @@ src/
   detectors/        # GPS-download detectors A/B/C (#4)
   ui/               # shared options/popup-surface helpers (authPanel)
   shared/           # formats, sniffing, dedupe, detection bus, alive marker
-  styles/           # vendored CTM design system (see styles/README.md)
+  styles/           # Tailwind v4 on tokens generated from CTM (see styles/README.md)
 manifest.base.json  # source of truth, transformed per-browser at build time
 vite.config.ts      # vite-plugin-web-extension build (per-browser)
 vitest.config.ts    # unit test config
-public/             # static assets copied as-is into each dist (icons, fonts, logo)
+public/             # static assets copied as-is into each dist (icons, logo)
 ```
 
 ## Dev

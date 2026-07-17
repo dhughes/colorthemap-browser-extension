@@ -47,7 +47,7 @@ jobs:
       - name: Generated theme present + parseable
         id: theme
         continue-on-error: true
-        run: npm run check:theme
+        run: npm run validate:theme
 
       - name: Build
         id: build

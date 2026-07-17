@@ -18,14 +18,12 @@ export function siblingCtmPath(mainRepoDir: string): string {
   return join(dirname(mainRepoDir), "color-the-map");
 }
 
-export interface CtmRepo {
-  path: string;
-  explicit: boolean;
-}
-
-export function resolveCtmRepo(env: NodeJS.ProcessEnv): CtmRepo | null {
+// An explicit CTM_REPO_PATH is returned unverified so the caller can hard-error
+// on a bad user-supplied path; the automatic sibling lookup only ever returns a
+// directory that exists (or null).
+export function resolveCtmRepo(env: NodeJS.ProcessEnv): string | null {
   if (env.CTM_REPO_PATH) {
-    return { path: env.CTM_REPO_PATH, explicit: true };
+    return env.CTM_REPO_PATH;
   }
   const porcelain = execFileSync("git", ["worktree", "list", "--porcelain"], {
     encoding: "utf8",
@@ -35,7 +33,7 @@ export function resolveCtmRepo(env: NodeJS.ProcessEnv): CtmRepo | null {
     return null;
   }
   const path = siblingCtmPath(mainRepo);
-  return existsSync(path) ? { path, explicit: false } : null;
+  return existsSync(path) ? path : null;
 }
 
 export function ctmGitInfo(repoPath: string): { sha: string; dirty: boolean } {

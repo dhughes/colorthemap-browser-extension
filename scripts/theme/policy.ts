@@ -24,27 +24,24 @@ export const V2_TOKEN_ALLOWLIST: readonly string[] = [
   "--dialog-max-h",
 ];
 
-// Tailwind theme keys that can't be derived mechanically from a var's own
-// name: namespace re-homes (spacing-*, container-*) and the --shell- prefix
-// drop CTM itself performs in its @theme block. Ladder colors and shadows are
-// mapped mechanically in emit.ts and don't appear here.
-export const THEME_KEY_MAP: ReadonlyArray<
+// Allowlisted tokens map into Tailwind's theme 1:1 by their own name (emit.ts
+// derives those mechanically, like ladder colors and shadows). These two lists
+// hold only the exceptions:
+//
+// Theme keys whose name differs from the source var — namespace re-homes
+// (spacing-*, container-*) and the --shell- prefix drop CTM itself performs.
+export const THEME_KEY_RENAMES: ReadonlyArray<
   readonly [themeKey: string, sourceVar: string]
 > = [
   ["--color-shell-scrim", "--shell-color-scrim"],
-  ["--radius-control", "--radius-control"],
-  ["--radius-card", "--radius-card"],
-  ["--radius-surface", "--radius-surface"],
-  ["--radius-pill", "--radius-pill"],
-  ["--font-system", "--font-system"],
-  ["--text-micro", "--text-micro"],
-  ["--text-secondary", "--text-secondary"],
-  ["--text-body", "--text-body"],
-  ["--text-input", "--text-input"],
-  ["--text-title", "--text-title"],
-  ["--tracking-micro", "--tracking-micro"],
   ["--spacing-touch", "--touch-target"],
   ["--container-dialog-card", "--dialog-w-card"],
   ["--container-dialog-panel", "--dialog-w-panel"],
   ["--spacing-dialog-max", "--dialog-max-h"],
 ];
+
+// Allowlisted tokens that deliberately get no Tailwind theme key — consumed
+// via var() only (--backdrop-scrim feeds the backdrop-scrim @utility).
+export const THEME_UNMAPPED: ReadonlySet<string> = new Set([
+  "--backdrop-scrim",
+]);

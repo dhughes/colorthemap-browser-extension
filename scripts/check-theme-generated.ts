@@ -56,16 +56,16 @@ if (isMain) {
     content = readFileSync(path, "utf8");
   } catch {
     console.error(
-      `[check:theme] missing: ${path} — run npm run generate:theme and commit the result`,
+      `[validate:theme] missing: ${path} — run npm run generate:theme and commit the result`,
     );
     process.exit(1);
   }
   const problems = validateThemeCss(content);
   if (problems.length > 0) {
     for (const problem of problems) {
-      console.error(`[check:theme] ${problem}`);
+      console.error(`[validate:theme] ${problem}`);
     }
     process.exit(1);
   }
-  console.log("[check:theme] theme.generated.css present and well-formed");
+  console.log("[validate:theme] theme.generated.css present and well-formed");
 }

@@ -87,7 +87,9 @@ export function alertClass(tone: AlertTone): string {
 
 // The shared text-input look ported from CTM's inputStyles.ts: border role
 // outline, control radius, white face, 16px type, and the field family's own
-// focus ring (2px at −1px offset, overriding the global 1px halo).
+// focus ring (2px at −1px offset, overriding the global 1px halo). No <input>
+// consumer yet — staged for #16's sign-in affordance; selectClass derives
+// from it today.
 export const inputClass =
   "w-full rounded-control border border-border bg-light-gray-100 p-3 text-input text-text transition-colors placeholder:text-text-faint hover:border-border-strong focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-magenta-500 disabled:cursor-not-allowed disabled:opacity-40";
 

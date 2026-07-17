@@ -111,6 +111,12 @@ describe("buildThemeSection", () => {
     expect(section).not.toContain("--fab-ring");
   });
 
+  it("maps every allowlisted token by its own name unless renamed or unmapped", () => {
+    expect(section).toContain("--tracking-micro: var(--tracking-micro);");
+    expect(section).not.toContain("--backdrop-scrim: var(--backdrop-scrim);");
+    expect(section).not.toContain("--touch-target: var(--touch-target);");
+  });
+
   it("maps the scrim rename and the policy theme keys", () => {
     expect(section).toContain("--color-shell-scrim: var(--shell-color-scrim);");
     expect(section).toContain("--spacing-touch: var(--touch-target);");

@@ -1,4 +1,8 @@
-import { THEME_KEY_MAP, V2_TOKEN_ALLOWLIST } from "./policy.ts";
+import {
+  THEME_KEY_RENAMES,
+  THEME_UNMAPPED,
+  V2_TOKEN_ALLOWLIST,
+} from "./policy.ts";
 import {
   collectVarNames,
   extractFirstTopLevelRootBlock,
@@ -57,20 +61,29 @@ export function buildV2TokensSection(tokensV2Css: string): string {
 // bg-red-600 fail visibly instead of resolving to Tailwind's defaults), then
 // pass-through `--x: var(--x)` keys — `inline` makes utilities resolve the
 // var at use-site, so they follow the surface-scoped re-binding under the
-// dark classes. Ladder colors and shadows map mechanically by name; the rest
-// comes from THEME_KEY_MAP.
+// dark classes. Everything maps mechanically by its own name (ladder colors,
+// shadows, allowlisted v2 tokens); policy.ts lists only the renames and the
+// deliberately unmapped tokens.
 export function buildThemeSection(params: {
   ladderCss: string;
   tokensV2Css: string;
 }): string {
   const colorNames = collectVarNames(params.ladderCss, "--color-");
   const shadowNames = collectVarNames(params.ladderCss, "--shadow-");
+  const renamedSources = new Set(THEME_KEY_RENAMES.map(([, source]) => source));
+  const v2PassThrough = V2_TOKEN_ALLOWLIST.filter(
+    (name) => !THEME_UNMAPPED.has(name) && !renamedSources.has(name),
+  );
+  const mappings = [
+    ...v2PassThrough.map((name) => [name, name] as const),
+    ...THEME_KEY_RENAMES,
+  ];
   const v2Body = extractFirstTopLevelRootBlock(params.tokensV2Css);
   const declared = new Set([
     ...collectVarNames(params.ladderCss, "--"),
     ...(v2Body === null ? [] : parseDeclarations(v2Body).map((d) => d.name)),
   ]);
-  const missing = THEME_KEY_MAP.filter(([, source]) => !declared.has(source));
+  const missing = mappings.filter(([, source]) => !declared.has(source));
   if (missing.length > 0) {
     throw new Error(
       `theme mapping source vars missing (renamed upstream?): ${missing
@@ -88,7 +101,7 @@ export function buildThemeSection(params: {
     "@theme inline {",
     ...colorNames.map((name) => `  ${name}: var(${name});`),
     ...shadowNames.map((name) => `  ${name}: var(${name});`),
-    ...THEME_KEY_MAP.map(([key, source]) => `  ${key}: var(${source});`),
+    ...mappings.map(([key, source]) => `  ${key}: var(${source});`),
     "}",
   ].join("\n");
 }

@@ -22,27 +22,30 @@ const checkMode = process.argv.includes("--check");
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const outputPath = join(repoRoot, OUTPUT_RELATIVE);
 
-const ctm = resolveCtmRepo(process.env);
-if (ctm === null) {
+const ctmPath = resolveCtmRepo(process.env);
+if (ctmPath === null) {
   console.warn(
     "[generate:theme] Color The Map checkout not found (expected as a sibling of the main repo; set CTM_REPO_PATH to override) — skipping regeneration, the committed theme.generated.css stays as-is",
   );
   process.exit(0);
 }
-if (!existsSync(ctm.path)) {
+if (!existsSync(ctmPath)) {
+  // Only reachable via an explicit CTM_REPO_PATH — the sibling lookup never
+  // returns a missing directory. A bad user-supplied path is an error, not a
+  // silent skip.
   console.error(
-    `[generate:theme] CTM_REPO_PATH points at a missing directory: ${ctm.path}`,
+    `[generate:theme] CTM_REPO_PATH points at a missing directory: ${ctmPath}`,
   );
   process.exit(1);
 }
 
-const stylesDir = join(ctm.path, "frontend", "src", "styles");
+const stylesDir = join(ctmPath, "frontend", "src", "styles");
 const ladderCss = readFileSync(
   join(stylesDir, "tokens-ladder.generated.css"),
   "utf8",
 );
 const tokensV2Css = readFileSync(join(stylesDir, "tokens-v2.css"), "utf8");
-const { sha, dirty } = ctmGitInfo(ctm.path);
+const { sha, dirty } = ctmGitInfo(ctmPath);
 const shortSha = sha.slice(0, 8);
 
 const assembled = assembleThemeCss({

@@ -208,14 +208,14 @@ function tracks(count: number): string {
 
 // Turns an upload outcome into the card the toast shows. A "done" result is
 // summarized from its counts; an "error" result (transport/auth failure) is
-// handed to translateFailureReason for friendly copy. CTM's raw per-file error
-// lines are never rendered — they're kept in the result for logging only.
+// handed to translateFailureReason for friendly copy. When nothing lands, CTM's
+// own per-file reason is surfaced (its errors are clean, actionable text).
 export function describeUploadOutcome(
   result: UploadResult,
   mapName: string,
 ): OutcomeCard {
   if (result.status === "error") {
-    return translateFailureReason(result.reason);
+    return translateFailureReason(result.reason, result.detail);
   }
 
   const landed = result.uploaded + result.duplicates;
@@ -244,7 +244,9 @@ export function describeUploadOutcome(
     };
   }
 
-  // Nothing landed.
+  // Nothing landed. Surface CTM's own per-file reason (its errors are clean,
+  // actionable text — "…no track points found", "Unsupported file type"),
+  // falling back to a generic line when it said nothing.
   return {
     tone: "error",
     title:
@@ -252,17 +254,23 @@ export function describeUploadOutcome(
         ? "Couldn't add that file"
         : "Couldn't add those files",
     message:
-      "Color The Map couldn't read it. Double-check the file and try again.",
+      result.errors[0] && result.errors[0].trim() !== ""
+        ? result.errors[0]
+        : "Color The Map couldn't read it. Double-check the file and try again.",
     showMapLink: false,
     action: null,
   };
 }
 
-// Transport/auth failures translated into approachable copy. This deliberately
-// supersedes the old "surface CTM's message verbatim" rule for the toast — #20
-// extends it by adding a UploadFailureReason case and a branch here.
+// Failures translated into approachable copy. Connectivity and auth get a
+// friendly, self-explanatory message; a server rejection surfaces CTM's own
+// message (its API returns clean `{detail}` text — "Map not found", "No track
+// points found", etc.), which is specific and actionable, falling back to a
+// generic line only when CTM said nothing useful. #20 extends this by adding a
+// UploadFailureReason case.
 export function translateFailureReason(
   reason: UploadFailureReason,
+  detail?: string,
 ): OutcomeCard {
   switch (reason) {
     case "sign-in-required":
@@ -291,11 +299,21 @@ export function translateFailureReason(
         action: null,
       };
     case "server":
+      return {
+        tone: "error",
+        title: "Couldn't add your file",
+        message:
+          detail && detail.trim() !== ""
+            ? detail
+            : "Color The Map couldn't add your file. Please try again.",
+        showMapLink: false,
+        action: null,
+      };
     case "unknown":
       return {
         tone: "error",
         title: "That didn't work",
-        message: "Color The Map couldn't add your file. Please try again.",
+        message: "Something went wrong. Please try again.",
         showMapLink: false,
         action: null,
       };

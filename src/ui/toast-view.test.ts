@@ -295,16 +295,24 @@ describe("describeUploadOutcome", () => {
     expect(card.showMapLink).toBe(false);
   });
 
-  it("does not leak backendy per-file error text into the message", () => {
+  it("surfaces CTM's per-file reason on an all-failed batch", () => {
     const card = describeUploadOutcome(
       done({
         failed: 1,
         total: 1,
-        errors: ["Traceback: ValueError at line 9"],
+        errors: ["route.kml: Unsupported file type"],
       }),
       "Trails",
     );
-    expect(card.message).not.toContain("Traceback");
+    expect(card.message).toContain("Unsupported file type");
+  });
+
+  it("falls back to a generic line when CTM gave no per-file reason", () => {
+    const card = describeUploadOutcome(
+      done({ failed: 1, total: 1, errors: [] }),
+      "Trails",
+    );
+    expect(card.message.toLowerCase()).toContain("couldn't read it");
   });
 
   it("translates a transport/auth failure into friendly copy", () => {
@@ -345,5 +353,15 @@ describe("translateFailureReason", () => {
       expect(card.action).toBeNull();
       expect(card.message).toBeTruthy();
     }
+  });
+
+  it("surfaces CTM's own message on a server rejection", () => {
+    const card = translateFailureReason("server", "Map not found");
+    expect(card.message).toBe("Map not found");
+  });
+
+  it("falls back to a generic line when the server said nothing useful", () => {
+    const card = translateFailureReason("server", "  ");
+    expect(card.message.toLowerCase()).toContain("couldn't add");
   });
 });

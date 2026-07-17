@@ -157,10 +157,11 @@ class UploadToastHost {
     style.textContent = shadowCss;
 
     // Anchored to the bottom-right; grows upward as cards stack, so the newest
-    // sits lowest ("under" the earlier ones) and nothing runs off-screen.
+    // sits lowest ("under" the earlier ones). No overflow clip — it would crop
+    // each card's raised shadow.
     this.stack = el(
       "div",
-      "fixed bottom-4 right-4 flex max-h-dialog-max flex-col items-end gap-3 overflow-hidden",
+      "fixed bottom-4 right-4 flex flex-col items-end gap-3",
     );
 
     this.shadow.append(style, this.stack);
@@ -248,7 +249,7 @@ class ToastCard {
 
     this.card = el(
       "div",
-      `${surfaceCardClass("light")} pointer-events-auto ctm-toast-enter flex w-full max-w-dialog-card flex-col text-text focus:outline-none`,
+      `${surfaceCardClass("light")} pointer-events-auto ctm-toast-enter flex w-[24rem] max-w-[calc(100vw-2rem)] flex-col text-text focus:outline-none`,
     );
     this.card.tabIndex = -1;
 

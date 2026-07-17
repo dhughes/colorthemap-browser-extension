@@ -11,8 +11,17 @@ import {
   type ListMapsResult,
   type UploadResult,
 } from "../upload/messages";
-import { dialogCss } from "./dialog-css";
+import shadowCss from "../styles/shadow.css?inline";
 import { describeOutcome, resolveInitialMapId } from "./dialog-view";
+import {
+  alertClass,
+  buttonClass,
+  closeButtonClass,
+  labelClass,
+  selectClass,
+  spinnerClass,
+  surfaceCardClass,
+} from "./recipes";
 
 const HOST_TAG = "ctm-upload-dialog";
 
@@ -166,24 +175,30 @@ class UploadDialog {
     this.shadow = this.host.attachShadow({ mode: "open" });
 
     const style = document.createElement("style");
-    style.textContent = dialogCss();
+    style.textContent = shadowCss;
 
-    const backdrop = el("div", "modal-backdrop");
-    const card = el("div", "card modal-card modal-card-column");
-    card.style.maxWidth = "420px";
+    const backdrop = el(
+      "div",
+      "fixed inset-0 flex items-center justify-center bg-shell-scrim backdrop-scrim p-6",
+    );
+    const card = el(
+      "div",
+      `${surfaceCardClass("light")} flex w-full max-w-dialog-card flex-col`,
+    );
     card.addEventListener("click", (event) => event.stopPropagation());
 
-    const header = el("div", "modal-header");
-    const title = el("h2", "modal-title");
+    const header = el(
+      "div",
+      "flex items-center justify-between gap-3 border-b border-border px-6 py-4",
+    );
+    const title = el("h2", "text-title font-semibold tracking-tight text-text");
     title.textContent = "Send to Color The Map";
-    const close = button("btn btn-icon", "×", () => this.close());
+    const close = button(closeButtonClass, "×", () => this.close());
     close.setAttribute("aria-label", "Close");
     header.append(title, close);
 
-    this.body = el("div", "card-body");
-    this.body.style.padding = "var(--space-xl)";
-    this.footer = el("div", "action-row");
-    this.footer.style.padding = "0 var(--space-xl) var(--space-xl)";
+    this.body = el("div", "p-6");
+    this.footer = el("div", "flex justify-end gap-2 px-6 pb-6");
 
     card.append(header, this.body, this.footer);
     backdrop.append(card);
@@ -248,7 +263,6 @@ class UploadDialog {
 
   private renderNoMaps(): void {
     const text = el("p");
-    text.style.margin = "0";
     text.append(
       document.createTextNode("You don't have any maps yet. "),
       anchor(`${CTM_BASE_URL}/maps`, "Create one on Color The Map"),
@@ -256,13 +270,12 @@ class UploadDialog {
     );
     this.body.replaceChildren(text);
     this.footer.replaceChildren(
-      button("btn btn-primary", "Close", () => this.close()),
+      button(buttonClass({ tone: "primary" }), "Close", () => this.close()),
     );
   }
 
   private renderForm(): void {
-    const summary = el("p");
-    summary.style.margin = "0 0 var(--space-lg)";
+    const summary = el("p", "mb-4");
     summary.append(
       document.createTextNode("Send "),
       strong(this.request.filename),
@@ -274,13 +287,12 @@ class UploadDialog {
     this.body.replaceChildren(summary);
 
     if (this.maps.length === 1) {
-      const only = el("p", "form-label");
-      only.style.margin = "0";
+      const only = el("p", labelClass);
       only.textContent = this.maps[0]!.name;
       this.body.append(only);
     } else {
       const select = document.createElement("select");
-      select.className = "form-select";
+      select.className = selectClass;
       for (const map of this.maps) {
         const option = document.createElement("option");
         option.value = String(map.id);
@@ -294,10 +306,18 @@ class UploadDialog {
       this.body.append(select);
     }
 
-    const cancel = button("btn", "Cancel", () => this.close());
-    const send = button("btn btn-primary", "Send to Color The Map", () => {
-      void this.send();
-    });
+    const cancel = button(
+      buttonClass({ emphasis: "secondary" }),
+      "Cancel",
+      () => this.close(),
+    );
+    const send = button(
+      buttonClass({ tone: "primary" }),
+      "Send to Color The Map",
+      () => {
+        void this.send();
+      },
+    );
     this.footer.replaceChildren(cancel, send);
   }
 
@@ -391,14 +411,11 @@ class UploadDialog {
   }): void {
     // The terminal state — re-enable close (Done / Esc / backdrop).
     this.sending = false;
-    const alert = el(
-      "div",
-      `alert ${copy.tone === "success" ? "alert-success" : "alert-error"}`,
-    );
+    const alert = el("div", alertClass(copy.tone));
     alert.textContent = copy.message;
     this.body.replaceChildren(alert);
     this.footer.replaceChildren(
-      button("btn btn-primary", "Done", () => this.close()),
+      button(buttonClass({ tone: "primary" }), "Done", () => this.close()),
     );
   }
 }
@@ -435,16 +452,14 @@ function anchor(href: string, text: string): HTMLAnchorElement {
   node.href = href;
   node.target = "_blank";
   node.rel = "noopener noreferrer";
+  node.className = "text-magenta-700 underline";
   node.textContent = text;
   return node;
 }
 
 function spinnerRow(label: string): HTMLElement {
-  const row = el("div");
-  row.style.display = "flex";
-  row.style.alignItems = "center";
-  row.style.gap = "var(--space-md)";
-  const spinner = el("div", "spinner");
+  const row = el("div", "flex items-center gap-3");
+  const spinner = el("div", spinnerClass);
   const text = el("span");
   text.textContent = label;
   row.append(spinner, text);

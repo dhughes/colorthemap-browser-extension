@@ -9,9 +9,10 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
-// Vite `?raw` imports: the file's contents as a string. Used to inline the
-// design-system CSS into a content-script shadow root.
-declare module "*.css?raw" {
+// Vite `?inline` imports: the file compiled through the CSS pipeline (Tailwind
+// included) and returned as a string instead of being injected. Used to carry
+// compiled theme CSS into a content-script shadow root.
+declare module "*.css?inline" {
   const content: string;
   export default content;
 }

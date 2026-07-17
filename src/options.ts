@@ -5,6 +5,7 @@ import {
   requestDisconnect,
   type AuthView,
 } from "./ui/authPanel";
+import { alertClass, buttonClass } from "./ui/recipes";
 
 const loggedOut = document.getElementById("logged-out")!;
 const loggedIn = document.getElementById("logged-in")!;
@@ -12,8 +13,19 @@ const avatar = document.getElementById("avatar") as HTMLImageElement;
 const email = document.getElementById("email")!;
 const signup = document.getElementById("signup") as HTMLAnchorElement;
 const authError = document.getElementById("auth-error")!;
+const connect = document.getElementById("connect")!;
+const disconnect = document.getElementById("disconnect")!;
 
 signup.href = CTM_SIGNUP_URL;
+
+// Recipe-styled controls get their classes here, not in the markup, so
+// recipes.ts stays the single source of the shared looks.
+authError.className = `${alertClass("error")} mb-6`;
+connect.className = buttonClass({ tone: "primary", size: "lg", width: "full" });
+disconnect.className = buttonClass({
+  tone: "destructive",
+  emphasis: "secondary",
+});
 
 function showError(message: string): void {
   authError.textContent = message;
@@ -40,14 +52,14 @@ function render(view: AuthView): void {
   }
 }
 
-document.getElementById("connect")!.addEventListener("click", () => {
+connect.addEventListener("click", () => {
   clearError();
   requestConnect().catch(() =>
     showError("Sign-in didn't complete. Please try again."),
   );
 });
 
-document.getElementById("disconnect")!.addEventListener("click", () => {
+disconnect.addEventListener("click", () => {
   clearError();
   requestDisconnect().catch(() =>
     showError("Couldn't disconnect. Please try again."),

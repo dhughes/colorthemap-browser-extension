@@ -1,0 +1,52 @@
+/* Tailwind v4 substrate for every extension surface. Preflight loads into the
+   `base` layer as the normalization floor (border-* utilities assume its
+   `border: 0 solid` reset). theme.generated.css is imported UNLAYERED so its
+   token declarations always beat the layered theme copies Tailwind emits for
+   the mapped keys — unlayered wins over layered. */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "./theme.generated.css";
+
+@layer base {
+  /* Extends preflight. Must stay layered: an unlayered universal reset would
+     beat every padding/margin utility (layer order trumps specificity). */
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  /* Keyboard-focus ring via outline, not box-shadow: outline competes with no
+     resting shadow, follows border-radius, and survives overflow: hidden.
+     Components with their own focus treatment override via unlayered rules. */
+  :focus-visible {
+    outline: 1px solid var(--color-magenta-500);
+    outline-offset: 2px;
+  }
+}
+
+/* Invisible expanded touch target (ported from CTM's tailwind.css): a dense
+   control's visual box may shrink, the hit target never drops below
+   --touch-target. An overflow-hidden ancestor clips the ::after and silently
+   collapses the floor — give such controls a padded wrapper instead. */
+@utility hit-target {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, var(--touch-target));
+    height: max(100%, var(--touch-target));
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* The v2 scrim blur — pairs with bg-shell-scrim on a modal backdrop. A named
+   utility because the value is a composite filter no Tailwind namespace maps. */
+@utility backdrop-scrim {
+  -webkit-backdrop-filter: var(--backdrop-scrim);
+  backdrop-filter: var(--backdrop-scrim);
+}

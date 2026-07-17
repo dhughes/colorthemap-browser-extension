@@ -1,0 +1,48 @@
+/* GENERATED FILE — do not edit.
+   Source of truth: frontend/scripts/generate-color-ladder.ts
+   Regenerate with `npm run generate:ladder`. Imported by tokens-v2.css. */
+
+/* The light ladder — mapped three times: :root (the page default) and both
+   light surface classes. */
+:root,
+.surface-light-solid,
+.surface-light-glass {
+  --color-magenta-500: #ff00ff;
+  --color-magenta-100: #ffc2ff;
+  --color-ink-500: #1a1a1a;
+
+  /* Roles — aliases into the ladder. */
+  --color-text: var(--color-ink-500);
+  --color-gps-accent: var(--color-magenta-500);
+}
+
+/* The dark mirror — roles re-declared so the aliases re-resolve in this
+   scope instead of inheriting the frozen :root values. */
+.surface-dark-solid,
+.surface-dark-glass {
+  --color-magenta-500: #ff00ff;
+  --color-magenta-100: #3d003d;
+  --color-ink-500: #e5e5e5;
+
+  --color-text: var(--color-ink-500);
+  --color-gps-accent: var(--color-magenta-500);
+}
+
+/* Faces — the material half of each surface. */
+.surface-light-solid {
+  background-color: #ffffff;
+}
+
+.surface-dark-solid {
+  background-color: #1a1a1a;
+}
+
+/* Translucent materials — frozen as literals so they stay
+   polarity-invariant. */
+:root {
+  --shell-color-scrim: rgba(26, 26, 26, 0.5);
+  --fab-ring-track: rgba(26, 26, 26, 0.5);
+  --shadow-float:
+    0 2px 10px rgba(26, 26, 26, 0.16), 0 0 0 0.5px rgba(26, 26, 26, 0.16);
+  --shadow-raised: 0 5px 40px rgba(26, 26, 26, 0.32);
+}

@@ -1,6 +1,6 @@
 import { CTM_BASE_URL } from "../auth/config";
 import { safeFilename } from "../shared/detection-url";
-import { UploadServerError } from "./errors";
+import { UploadNetworkError, UploadServerError } from "./errors";
 import { ctmFetch } from "./fetch-ctm";
 
 // CTM's synchronous per-file upload response. The import is done by the time
@@ -55,7 +55,8 @@ export async function uploadTracks(params: {
     errors: [],
   };
 
-  for (const file of params.files) {
+  for (let i = 0; i < params.files.length; i++) {
+    const file = params.files[i]!;
     const form = new FormData();
     form.append("files", new Blob([file.bytes]), safeFilename(file.filename));
 
@@ -72,6 +73,22 @@ export async function uploadTracks(params: {
         outcome.failed += 1;
         outcome.errors.push(`${file.filename}: ${perFileReason(error)}`);
         continue;
+      }
+      // The connection dropped mid-batch. If earlier files already landed on
+      // the map, don't discard them by throwing — fail this file and the rest
+      // with the reason and return what we have. When nothing has landed yet,
+      // rethrow so the handler shows the clean "couldn't reach CTM" card.
+      if (
+        error instanceof UploadNetworkError &&
+        (outcome.uploaded > 0 || outcome.duplicates > 0)
+      ) {
+        for (const remaining of params.files.slice(i)) {
+          outcome.failed += 1;
+          outcome.errors.push(
+            `${remaining.filename}: couldn't reach Color The Map`,
+          );
+        }
+        return outcome;
       }
       throw error;
     }

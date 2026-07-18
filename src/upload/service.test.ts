@@ -174,7 +174,7 @@ describe("uploadTracks", () => {
     );
   });
 
-  it("aborts the whole send on a network failure", async () => {
+  it("aborts the whole send on a network failure when nothing has landed", async () => {
     fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
 
     const error = await uploadTracks({
@@ -185,6 +185,26 @@ describe("uploadTracks", () => {
     }).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(UploadNetworkError);
+  });
+
+  it("keeps earlier successes when the connection drops mid-batch", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(batch({ uploaded: 1 })))
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    const result = await uploadTracks({
+      accessToken: "t",
+      mapId: 1,
+      files: [
+        { filename: "ride.gpx", bytes: bytes("<gpx/>") },
+        { filename: "walk.gpx", bytes: bytes("<gpx/>") },
+      ],
+      baseUrl: BASE,
+    });
+
+    expect(result.uploaded).toBe(1);
+    expect(result.failed).toBe(1);
+    expect(result.errors[0]).toContain("couldn't reach Color The Map");
   });
 });
 

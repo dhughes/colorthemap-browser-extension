@@ -99,7 +99,7 @@ export const labelClass = "text-secondary font-semibold text-text";
 
 // A compact uppercase pill for a file's detected format (GPX / FIT / …): the
 // micro type on a fill-tinted rounded chip. Polarity-aware via the ladder, so
-// it reads correctly on the #21 toast's dark surface.
+// it reads correctly on either surface.
 export const formatBadgeClass =
   "inline-flex items-center rounded-pill bg-fill px-2 py-0.5 text-micro font-semibold uppercase tracking-micro text-text-muted";
 

@@ -605,14 +605,6 @@ class ToastCard {
       this.countdown = startCountdown(SUCCESS_COUNTDOWN_MS, now());
       this.showBarIfRunning();
     }
-
-    if (card.tone === "error") {
-      this.countdown = null;
-      this.hideBar();
-    } else {
-      this.countdown = startCountdown(SUCCESS_COUNTDOWN_MS, now());
-      this.showBarIfRunning();
-    }
   }
 
   private mapName(mapId: number): string {
@@ -630,6 +622,8 @@ class ToastCard {
     if (this.countdown?.status === "running") {
       this.countdown = pauseCountdown(this.countdown, now());
       this.reflectCountdown();
+      // The bar is frozen while paused — stop the rAF loop; resume restarts it.
+      this.stopTicking();
     }
   }
 

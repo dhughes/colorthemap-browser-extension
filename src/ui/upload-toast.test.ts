@@ -296,6 +296,28 @@ describe("send", () => {
     expect(newestCard().dataset.countdown).toBe("none");
   });
 
+  it("presents a rejected file as a name-over-reason row", async () => {
+    uploadResult({
+      status: "done",
+      uploaded: 0,
+      duplicates: 0,
+      failed: 1,
+      total: 1,
+      errors: ["server-reject.gpx: couldn't read a track from the file"],
+    });
+    openUploadToast(file());
+    await waitForPhase(newestCard(), "offer");
+
+    q(newestCard(), "button.bg-magenta-500").click();
+    await waitForPhase(newestCard(), "error");
+
+    expect(newestCard().textContent).toContain("Couldn't add that file");
+    const rows = newestCard().querySelectorAll("li");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.textContent).toContain("server-reject.gpx");
+    expect(rows[0]!.textContent).toContain("couldn't read a track");
+  });
+
   it("re-authenticates via the options page on an expired session", async () => {
     uploadResult({ status: "error", reason: "sign-in-required" });
     openUploadToast(file());

@@ -192,24 +192,58 @@ export function successDeepLink(mapId: number): string {
 
 // ─── Outcome ─────────────────────────────────────────────────────────────────
 
+// One failed file, split into its name and reason so the toast can present
+// them on separate lines (CTM's receipt shows the filename apart from the why).
+export interface FailureDetail {
+  file: string;
+  reason: string;
+}
+
 export interface OutcomeCard {
   tone: "success" | "warning" | "error";
   title: string;
   message: string;
+  // Per-file failures, shown as name-over-reason rows under the message —
+  // mirrors CTM's receipt accounting.
+  details: FailureDetail[];
   // Whether to offer the "Open your map" link (something landed on the map).
   showMapLink: boolean;
   // An extra action beyond Done, e.g. re-authenticating.
   action: { label: string; kind: "sign-in" } | null;
 }
 
-function tracks(count: number): string {
-  return count === 1 ? "1 track" : `${count} tracks`;
+// Splits a "name: reason" failure line into its parts. The upload path emits
+// this shape (and CTM's own per-file errors follow it too); a line without the
+// separator becomes an unattributed reason.
+function parseFailure(line: string): FailureDetail {
+  const at = line.indexOf(": ");
+  if (at === -1) {
+    return { file: "", reason: line };
+  }
+  return { file: line.slice(0, at), reason: line.slice(at + 2) };
 }
 
-// Turns an upload outcome into the card the toast shows. A "done" result is
-// summarized from its counts; an "error" result (transport/auth failure) is
-// handed to translateFailureReason for friendly copy. When nothing lands, CTM's
-// own per-file reason is surfaced (its errors are clean, actionable text).
+// A CTM-style tally in fixed order (added · already on your map · failed) —
+// only the non-zero buckets, so "1 added · 2 already on your map" reads at a
+// glance. (Same-map and cross-source duplicates are merged as "already on your
+// map"; the extension doesn't need CTM's synced-version nuance.)
+function outcomeTally(result: {
+  uploaded: number;
+  duplicates: number;
+  failed: number;
+}): string {
+  const parts: string[] = [];
+  if (result.uploaded > 0) parts.push(`${result.uploaded} added`);
+  if (result.duplicates > 0)
+    parts.push(`${result.duplicates} already on your map`);
+  if (result.failed > 0) parts.push(`${result.failed} failed`);
+  return parts.join(" · ");
+}
+
+// Turns an upload outcome into the card the toast shows, mimicking CTM's upload
+// receipt: a disposition (clean / issues / failed), a tally of the buckets, and
+// per-file reasons under failures. An "error" result (transport/auth failure)
+// is handed to translateFailureReason instead.
 export function describeUploadOutcome(
   result: UploadResult,
   mapName: string,
@@ -219,34 +253,48 @@ export function describeUploadOutcome(
   }
 
   const landed = result.uploaded + result.duplicates;
+  const tally = outcomeTally(result);
 
-  if (result.failed === 0 && landed > 0) {
-    const message =
-      result.uploaded > 0
-        ? `${tracks(result.uploaded)} added to ${mapName}.`
-        : `Already on ${mapName}.`;
+  // CTM accepted and rejected nothing — treat as a soft failure.
+  if (landed === 0 && result.failed === 0) {
+    return {
+      tone: "error",
+      title: "Nothing to add",
+      message: `Color The Map didn't find anything to import to ${mapName}.`,
+      details: [],
+      showMapLink: false,
+      action: null,
+    };
+  }
+
+  // Clean — nothing failed.
+  if (result.failed === 0) {
     return {
       tone: "success",
-      title: "You're on the map",
-      message,
+      title: result.uploaded > 0 ? "You're on the map" : "Already on your map",
+      message: tally,
+      details: [],
       showMapLink: true,
       action: null,
     };
   }
 
-  if (landed > 0 && result.failed > 0) {
+  const failures = result.errors.map(parseFailure);
+
+  // Some landed, some failed.
+  if (landed > 0) {
     return {
       tone: "warning",
-      title: `Added ${landed} of ${result.total}`,
-      message: `The rest couldn't be read, but the others are on ${mapName}.`,
+      title: "Not everything made it",
+      message: tally,
+      details: failures,
       showMapLink: true,
       action: null,
     };
   }
 
-  // Nothing landed. Surface CTM's own per-file reason (its errors are clean,
-  // actionable text — "…no track points found", "Unsupported file type"),
-  // falling back to a generic line when it said nothing.
+  // Nothing landed. The failure rows carry the why; keep a fallback line for
+  // when CTM said nothing.
   return {
     tone: "error",
     title:
@@ -254,9 +302,10 @@ export function describeUploadOutcome(
         ? "Couldn't add that file"
         : "Couldn't add those files",
     message:
-      result.errors[0] && result.errors[0].trim() !== ""
-        ? result.errors[0]
-        : "Color The Map couldn't read it. Double-check the file and try again.",
+      failures.length > 0
+        ? ""
+        : "Color The Map couldn't read it. Double-check it and try again.",
+    details: failures,
     showMapLink: false,
     action: null,
   };
@@ -278,6 +327,7 @@ export function translateFailureReason(
         tone: "error",
         title: "Please sign in again",
         message: "Your Color The Map session expired. Sign in and try again.",
+        details: [],
         showMapLink: false,
         action: { label: "Sign in", kind: "sign-in" },
       };
@@ -286,6 +336,7 @@ export function translateFailureReason(
         tone: "error",
         title: "Couldn't reach Color The Map",
         message: "Check your connection and give it another try.",
+        details: [],
         showMapLink: false,
         action: null,
       };
@@ -295,6 +346,7 @@ export function translateFailureReason(
         title: "Permission needed",
         message:
           "Color The Map needs your OK to read that file. Try again to allow it.",
+        details: [],
         showMapLink: false,
         action: null,
       };
@@ -306,6 +358,7 @@ export function translateFailureReason(
           detail && detail.trim() !== ""
             ? detail
             : "Color The Map couldn't add your file. Please try again.",
+        details: [],
         showMapLink: false,
         action: null,
       };
@@ -314,6 +367,7 @@ export function translateFailureReason(
         tone: "error",
         title: "That didn't work",
         message: "Something went wrong. Please try again.",
+        details: [],
         showMapLink: false,
         action: null,
       };

@@ -538,9 +538,33 @@ class ToastCard {
     this.setPhase(card.tone === "error" ? "error" : "success");
     this.title.textContent = card.title;
 
-    const message = el("p", "text-secondary text-text");
-    message.textContent = card.message;
-    this.body.replaceChildren(message);
+    const body: Node[] = [];
+    if (card.message !== "") {
+      const message = el("p", "text-secondary text-text");
+      message.textContent = card.message;
+      body.push(message);
+    }
+    if (card.details.length > 0) {
+      const list = el(
+        "ul",
+        `flex flex-col gap-2 ${card.message !== "" ? "mt-3" : ""}`,
+      );
+      for (const failure of card.details) {
+        const row = el("li", "flex flex-col gap-0.5");
+        if (failure.file !== "") {
+          const name = el("p", "truncate text-secondary font-medium text-text");
+          name.textContent = failure.file;
+          name.title = failure.file;
+          row.append(name);
+        }
+        const reason = el("p", "text-micro text-text-muted");
+        reason.textContent = failure.reason;
+        row.append(reason);
+        list.append(row);
+      }
+      body.push(list);
+    }
+    this.body.replaceChildren(...body);
 
     // The primary action, if any: open the map (success) or sign in again (an
     // expired session). It pairs with Done as two equal pills; a plain outcome

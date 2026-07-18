@@ -264,7 +264,16 @@ describe("describeUploadOutcome", () => {
     );
     expect(card.tone).toBe("success");
     expect(card.showMapLink).toBe(true);
-    expect(card.message).toContain("Trails");
+    expect(card.message).toBe("2 added");
+  });
+
+  it("reports added and already-there in one tally", () => {
+    const card = describeUploadOutcome(
+      done({ uploaded: 1, duplicates: 2, total: 3 }),
+      "Trails",
+    );
+    expect(card.tone).toBe("success");
+    expect(card.message).toBe("1 added · 2 already on your map");
   });
 
   it("treats an all-duplicate batch as a benign success", () => {
@@ -273,17 +282,26 @@ describe("describeUploadOutcome", () => {
       "Trails",
     );
     expect(card.tone).toBe("success");
+    expect(card.title.toLowerCase()).toContain("already");
     expect(card.showMapLink).toBe(true);
   });
 
-  it("warns on a partial batch but still links the map", () => {
+  it("warns on a partial batch, tallies it, and lists the failures", () => {
     const card = describeUploadOutcome(
-      done({ uploaded: 2, failed: 1, total: 3 }),
+      done({
+        uploaded: 2,
+        failed: 1,
+        total: 3,
+        errors: ["bad.gpx: no track data in the file"],
+      }),
       "Trails",
     );
     expect(card.tone).toBe("warning");
     expect(card.showMapLink).toBe(true);
-    expect(card.title).toContain("2 of 3");
+    expect(card.message).toBe("2 added · 1 failed");
+    expect(card.details).toEqual([
+      { file: "bad.gpx", reason: "no track data in the file" },
+    ]);
   });
 
   it("treats an all-failed batch as an error with no map link", () => {
@@ -295,7 +313,14 @@ describe("describeUploadOutcome", () => {
     expect(card.showMapLink).toBe(false);
   });
 
-  it("surfaces CTM's per-file reason on an all-failed batch", () => {
+  it("treats an empty result (nothing added or failed) as a soft failure", () => {
+    const card = describeUploadOutcome(done({ total: 1 }), "Trails");
+    expect(card.tone).toBe("error");
+    expect(card.showMapLink).toBe(false);
+    expect(card.title.toLowerCase()).toContain("nothing");
+  });
+
+  it("splits an all-failed file into a name-over-reason row", () => {
     const card = describeUploadOutcome(
       done({
         failed: 1,
@@ -304,7 +329,9 @@ describe("describeUploadOutcome", () => {
       }),
       "Trails",
     );
-    expect(card.message).toContain("Unsupported file type");
+    expect(card.details).toEqual([
+      { file: "route.kml", reason: "Unsupported file type" },
+    ]);
   });
 
   it("falls back to a generic line when CTM gave no per-file reason", () => {

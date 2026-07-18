@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { UploadServerError } from "./errors";
 import { fetchMaps } from "./maps";
 
 const BASE = "https://dev.colorthemap.app";
@@ -56,11 +57,15 @@ describe("fetchMaps", () => {
     expect(await fetchMaps("access-xyz", BASE)).toEqual([]);
   });
 
-  it("throws CTM's detail message on a non-OK response", async () => {
+  it("throws a typed server error with CTM's detail on a non-OK response", async () => {
     fetchMock.mockResolvedValue(
       jsonResponse({ detail: "Could not validate credentials" }, 401),
     );
-    await expect(fetchMaps("access-xyz", BASE)).rejects.toThrow(
+
+    const error = await fetchMaps("access-xyz", BASE).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(UploadServerError);
+    expect((error as UploadServerError).message).toBe(
       "Could not validate credentials",
     );
   });

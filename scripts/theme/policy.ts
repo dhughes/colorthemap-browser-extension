@@ -22,6 +22,9 @@ export const V2_TOKEN_ALLOWLIST: readonly string[] = [
   "--dialog-w-card",
   "--dialog-w-panel",
   "--dialog-max-h",
+  "--transition-chrome",
+  "--duration-detent",
+  "--ease-detent",
 ];
 
 // Allowlisted tokens map into Tailwind's theme 1:1 by their own name (emit.ts
@@ -41,7 +44,11 @@ export const THEME_KEY_RENAMES: ReadonlyArray<
 ];
 
 // Allowlisted tokens that deliberately get no Tailwind theme key — consumed
-// via var() only (--backdrop-scrim feeds the backdrop-scrim @utility).
+// via var() only (--backdrop-scrim feeds the backdrop-scrim @utility; the two
+// motion values feed the toast keyframes/transitions in shadow.css). Mirrors
+// CTM's own tailwind.css, which theme-maps only --ease-detent of the three.
 export const THEME_UNMAPPED: ReadonlySet<string> = new Set([
   "--backdrop-scrim",
+  "--transition-chrome",
+  "--duration-detent",
 ]);

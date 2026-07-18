@@ -12,7 +12,7 @@ import {
 } from "./shared/messages";
 import { initDetectorB, type DownloadDetection } from "./detectors/detector-b";
 import { handleUploadMessage } from "./upload/handler";
-import { openDialogMessage } from "./upload/messages";
+import { openToastMessage } from "./upload/messages";
 
 console.log(aliveMessage("background"));
 
@@ -68,17 +68,17 @@ function handleDetection(message: DetectionMessage): void {
 
 onDetection(handleDetection);
 
-// Detector B (the downloads API) runs in the background; the dialog is
+// Detector B (the downloads API) runs in the background; the toast is
 // content-script UI, so ask the active tab to open it. The download itself
 // proceeds normally — we only also offer to send it to Color The Map.
-async function openDownloadDialog(detection: DownloadDetection): Promise<void> {
+async function openDownloadToast(detection: DownloadDetection): Promise<void> {
   try {
     const [tab] = await browser.tabs.query({
       active: true,
       currentWindow: true,
     });
     if (tab?.id != null) {
-      await browser.tabs.sendMessage(tab.id, openDialogMessage(detection));
+      await browser.tabs.sendMessage(tab.id, openToastMessage(detection));
     }
   } catch {
     // No active tab or no content script there — nothing to open.
@@ -94,7 +94,7 @@ initDetectorB((detection) => {
       url: detection.url,
     }),
   );
-  void openDownloadDialog(detection);
+  void openDownloadToast(detection);
 });
 
 // onStartup only fires on browser launch; an evicted MV3 SW re-spun by any

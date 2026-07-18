@@ -1,5 +1,5 @@
 import { isDetectionEnabledForHost } from "../shared/gate";
-import { openUploadDialog } from "../ui/upload-dialog";
+import { openUploadToast } from "../ui/upload-toast";
 import { isDetectorAMessage } from "./detector-a-protocol";
 
 export function initDetectorABridge(): void {
@@ -21,11 +21,10 @@ export function initDetectorABridge(): void {
     }
     // The page fetched a GPS file — offer to also send it to CTM. The bytes the
     // main world captured ride along (base64), so the upload doesn't re-fetch.
-    openUploadDialog({
+    openUploadToast({
       url: event.data.url,
       filename: event.data.filename,
       format: event.data.format,
-      sourceHostname: location.hostname,
       bytesBase64: event.data.bytesBase64,
     });
   });

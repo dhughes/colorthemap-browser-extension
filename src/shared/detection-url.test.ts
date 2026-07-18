@@ -95,8 +95,8 @@ describe("linkDownloadFormat", () => {
   });
 
   it("still resolves the Polar zip variant by format (content sniff filters it later)", () => {
-    // The zip link shares the TCX path; URL-level it looks like TCX. The dialog's
-    // same-origin matchesFormat check rejects the zip bytes, so no dialog shows.
+    // The zip link shares the TCX path; URL-level it looks like TCX. The toast's
+    // same-origin matchesFormat check rejects the zip bytes, so no toast shows.
     expect(
       linkDownloadFormat(
         "https://flow.polar.com/api/export/training/tcx/8357513887?compress=true",

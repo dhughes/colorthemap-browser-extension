@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { UploadNetworkError, UploadServerError } from "./errors";
+import { UploadNetworkError } from "./errors";
 import { fetchFileBytes, uploadTracks } from "./service";
 
 const BASE = "https://dev.colorthemap.app";
@@ -34,9 +34,9 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("uploadTracks", () => {
-  it("POSTs one multipart request carrying every file under the same key", async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse(batch({ uploaded: 2, track_ids: [98, 99] })),
+  it("POSTs each file in its own request (one file per request)", async () => {
+    fetchMock.mockImplementation(async () =>
+      jsonResponse(batch({ uploaded: 1 })),
     );
 
     const result = await uploadTracks({
@@ -49,12 +49,18 @@ describe("uploadTracks", () => {
       baseUrl: BASE,
     });
 
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe(`${BASE}/api/v1/maps/42/tracks`);
     expect(init.method).toBe("POST");
     expect(init.headers.Authorization).toBe("Bearer access-xyz");
-    const files = (init.body as FormData).getAll("files") as File[];
-    expect(files.map((f) => f.name)).toEqual(["ride.gpx", "walk.kml"]);
+    for (const [, callInit] of fetchMock.mock.calls) {
+      expect((callInit.body as FormData).getAll("files")).toHaveLength(1);
+    }
+    const names = fetchMock.mock.calls.map(
+      ([, callInit]) => ((callInit.body as FormData).get("files") as File).name,
+    );
+    expect(names).toEqual(["ride.gpx", "walk.kml"]);
     expect(result).toEqual({
       uploaded: 2,
       duplicates: 0,
@@ -63,8 +69,10 @@ describe("uploadTracks", () => {
     });
   });
 
-  it("sanitizes every filename before sending it to CTM", async () => {
-    fetchMock.mockResolvedValue(jsonResponse(batch({ uploaded: 2 })));
+  it("sanitizes each filename before sending it to CTM", async () => {
+    fetchMock.mockImplementation(async () =>
+      jsonResponse(batch({ uploaded: 1 })),
+    );
 
     await uploadTracks({
       accessToken: "t",
@@ -76,17 +84,20 @@ describe("uploadTracks", () => {
       baseUrl: BASE,
     });
 
-    const [, init] = fetchMock.mock.calls[0]!;
-    const files = (init.body as FormData).getAll("files") as File[];
-    expect(files.map((f) => f.name)).toEqual(["_evil_.gpx", "fine.gpx"]);
+    const names = fetchMock.mock.calls.map(
+      ([, init]) => ((init.body as FormData).get("files") as File).name,
+    );
+    expect(names).toEqual(["_evil_.gpx", "fine.gpx"]);
   });
 
-  it("keeps CTM's per-file error lines verbatim in the counts", async () => {
+  it("aggregates per-file failures and CTM's error lines across requests", async () => {
     const reason =
       "route.kml: Unsupported file type (use .gpx, .csv, .fit, .fit.gz, .tcx, .kml, or .kmz)";
-    fetchMock.mockResolvedValue(
-      jsonResponse(batch({ uploaded: 1, failed: 1, errors: [reason] })),
-    );
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(batch({ uploaded: 1 })))
+      .mockResolvedValueOnce(
+        jsonResponse(batch({ failed: 1, errors: [reason] })),
+      );
 
     const result = await uploadTracks({
       accessToken: "t",
@@ -107,14 +118,11 @@ describe("uploadTracks", () => {
   });
 
   it("counts same-source and cross-source duplicates together", async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse(
-        batch({
-          duplicates: ["ride.gpx"],
-          cross_source_duplicates: ["walk.kml"],
-        }),
-      ),
-    );
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(batch({ duplicates: ["ride.gpx"] })))
+      .mockResolvedValueOnce(
+        jsonResponse(batch({ cross_source_duplicates: ["walk.kml"] })),
+      );
 
     const result = await uploadTracks({
       accessToken: "t",
@@ -129,22 +137,44 @@ describe("uploadTracks", () => {
     expect(result.duplicates).toBe(2);
   });
 
-  it("throws a typed server error carrying CTM's detail on a non-OK response", async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ detail: "Map not found" }, 404));
+  it("tallies one file's server rejection and keeps going", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(batch({ uploaded: 1 })))
+      .mockResolvedValueOnce(jsonResponse({ detail: "No track points" }, 422));
 
-    const error = await uploadTracks({
+    const result = await uploadTracks({
       accessToken: "t",
-      mapId: 999,
-      files: [{ filename: "ride.gpx", bytes: bytes("<gpx/>") }],
+      mapId: 1,
+      files: [
+        { filename: "ride.gpx", bytes: bytes("<gpx/>") },
+        { filename: "empty.gpx", bytes: bytes("<gpx/>") },
+      ],
       baseUrl: BASE,
-    }).catch((e: unknown) => e);
+    });
 
-    expect(error).toBeInstanceOf(UploadServerError);
-    expect((error as UploadServerError).status).toBe(404);
-    expect((error as UploadServerError).message).toBe("Map not found");
+    expect(result.uploaded).toBe(1);
+    expect(result.failed).toBe(1);
+    expect(result.errors[0]).toBe("empty.gpx: No track points");
   });
 
-  it("throws a typed network error when the request never reaches CTM", async () => {
+  it("maps a bodyless client error to a friendly per-file reason", async () => {
+    // A 400 with no JSON detail — "HTTP 400" would help nobody.
+    fetchMock.mockResolvedValueOnce(new Response("", { status: 400 }));
+
+    const result = await uploadTracks({
+      accessToken: "t",
+      mapId: 1,
+      files: [{ filename: "server-reject.gpx", bytes: bytes("<gpx/>") }],
+      baseUrl: BASE,
+    });
+
+    expect(result.failed).toBe(1);
+    expect(result.errors[0]).toBe(
+      "server-reject.gpx: couldn't read a track from the file",
+    );
+  });
+
+  it("aborts the whole send on a network failure", async () => {
     fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
 
     const error = await uploadTracks({

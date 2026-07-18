@@ -1,11 +1,13 @@
 import { CTM_BASE_URL } from "../auth/config";
 import { safeFilename } from "../shared/detection-url";
+import { UploadServerError } from "./errors";
 import { ctmFetch } from "./fetch-ctm";
 
-// CTM's synchronous multi-file upload response (BatchUploadResponse). The import
-// is done by the time this returns, so success, duplicates, and parse failures
-// are all reported here — no SSE needed.
-interface BatchUploadResponse {
+// CTM's synchronous per-file upload response. The import is done by the time
+// this returns, so success, duplicates, and parse failures are all reported
+// here — no SSE needed. (The endpoint takes one file per request; the counts
+// are still arrays/totals since it shares the batch response shape.)
+interface TrackUploadResponse {
   uploaded: number;
   failed: number;
   track_ids: number[];
@@ -14,9 +16,9 @@ interface BatchUploadResponse {
   cross_source_duplicates: string[];
 }
 
-// What one CTM batch POST produced, trimmed to the counts + verbatim per-file
-// error lines the toast needs. Transport/auth failures never reach here — they
-// throw out of ctmFetch and are classified in the handler.
+// What a whole send produced, trimmed to the counts + verbatim per-file error
+// lines the toast needs. Auth/network failures never reach here — they throw
+// out and are classified in the handler.
 export interface BatchOutcome {
   uploaded: number;
   duplicates: number;
@@ -33,8 +35,11 @@ export async function fetchFileBytes(url: string): Promise<ArrayBuffer> {
   return response.arrayBuffer();
 }
 
-// Uploads a batch of GPS files to one CTM map via the multipart endpoint
-// (`files: List[UploadFile]`) and reduces CTM's response to plain counts.
+// Uploads the files to one CTM map and reduces the results to plain counts.
+// CTM's /tracks endpoint accepts exactly one file per request, so the files go
+// up sequentially. A per-file server rejection (a 4xx/5xx for that file) is
+// tallied and the send continues; a network failure aborts (the rest would
+// fail the same way).
 export async function uploadTracks(params: {
   accessToken: string;
   mapId: number;
@@ -42,25 +47,57 @@ export async function uploadTracks(params: {
   baseUrl?: string;
 }): Promise<BatchOutcome> {
   const baseUrl = params.baseUrl ?? CTM_BASE_URL;
-  const form = new FormData();
+  const url = `${baseUrl}/api/v1/maps/${params.mapId}/tracks`;
+  const outcome: BatchOutcome = {
+    uploaded: 0,
+    duplicates: 0,
+    failed: 0,
+    errors: [],
+  };
+
   for (const file of params.files) {
+    const form = new FormData();
     form.append("files", new Blob([file.bytes]), safeFilename(file.filename));
+
+    let body: TrackUploadResponse;
+    try {
+      const response = await ctmFetch(url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${params.accessToken}` },
+        body: form,
+      });
+      body = (await response.json()) as TrackUploadResponse;
+    } catch (error) {
+      if (error instanceof UploadServerError) {
+        outcome.failed += 1;
+        outcome.errors.push(`${file.filename}: ${perFileReason(error)}`);
+        continue;
+      }
+      throw error;
+    }
+
+    outcome.uploaded += body.uploaded;
+    outcome.duplicates +=
+      body.duplicates.length + body.cross_source_duplicates.length;
+    outcome.failed += body.failed;
+    outcome.errors.push(...body.errors);
   }
 
-  const response = await ctmFetch(
-    `${baseUrl}/api/v1/maps/${params.mapId}/tracks`,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${params.accessToken}` },
-      body: form,
-    },
-  );
+  return outcome;
+}
 
-  const body = (await response.json()) as BatchUploadResponse;
-  return {
-    uploaded: body.uploaded,
-    duplicates: body.duplicates.length + body.cross_source_duplicates.length,
-    failed: body.failed,
-    errors: body.errors,
-  };
+// A human reason for one file's server rejection: CTM's own message when it
+// gave one, otherwise mapped from the status — a bare "HTTP 400" helps nobody.
+function perFileReason(error: UploadServerError): string {
+  const message = error.message.trim();
+  if (message !== "" && !/^HTTP \d+$/i.test(message)) {
+    return message;
+  }
+  if (error.status === 413) {
+    return "file too large";
+  }
+  if (error.status >= 400 && error.status < 500) {
+    return "couldn't read a track from the file";
+  }
+  return "a server error occurred";
 }

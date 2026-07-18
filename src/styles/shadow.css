@@ -16,6 +16,18 @@
   font-size: var(--text-body);
   line-height: 1.5;
   color: var(--color-text);
+
+  /* Tailwind v4 composes box-shadow from these vars, defaulting them via
+     @property initial-values. @property registration is document-scoped, so it
+     does NOT take effect inside a shadow root — leaving the vars unset makes the
+     composed box-shadow invalid, so every shadow and ring utility silently
+     renders nothing. Default them here so they inherit to the surfaces; a
+     shadow utility still overrides --tw-shadow on its own element. */
+  --tw-shadow: 0 0 #0000;
+  --tw-inset-shadow: 0 0 #0000;
+  --tw-inset-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
 }
 
 /* ─── #21 action toast ──────────────────────────────────────────────────────

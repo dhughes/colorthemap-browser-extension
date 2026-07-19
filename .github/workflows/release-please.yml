@@ -18,6 +18,12 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
+        with:
+          # A fine-grained PAT (not the default GITHUB_TOKEN) so the release PR
+          # this opens is seen as a real event and triggers the required check
+          # workflows (ci.yml, pr-title.yml). GITHUB_TOKEN-authored PRs don't
+          # trigger workflows, which would deadlock branch protection.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
   publish:
     name: Build & attach artifacts

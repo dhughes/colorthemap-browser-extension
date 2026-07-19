@@ -17,9 +17,15 @@ vi.mock("./service", () => ({
 beforeEach(() => vi.clearAllMocks());
 
 describe("handleAuthMessage", () => {
-  it("starts the auth flow for a start-auth message", () => {
+  it("starts the auth flow for a start-auth message, opening options by default", () => {
     handleAuthMessage(startAuthMessage());
     expect(service.startAuthFlow).toHaveBeenCalledTimes(1);
+    expect(service.startAuthFlow).toHaveBeenCalledWith({ openOptions: true });
+  });
+
+  it("forwards openOptions:false so a toast-initiated login stays in place", () => {
+    handleAuthMessage(startAuthMessage({ openOptions: false }));
+    expect(service.startAuthFlow).toHaveBeenCalledWith({ openOptions: false });
   });
 
   it("logs out for a logout message", () => {

@@ -22,6 +22,11 @@ describe("auth message creators", () => {
     expect(message.type).toBe(AUTH_MESSAGE_TYPES.authStateChanged);
     expect(message.state).toEqual(state);
   });
+
+  it("carries openOptions on a start-auth message only when set", () => {
+    expect(startAuthMessage().openOptions).toBeUndefined();
+    expect(startAuthMessage({ openOptions: false }).openOptions).toBe(false);
+  });
 });
 
 describe("isAuthMessage", () => {

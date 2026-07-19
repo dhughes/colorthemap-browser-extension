@@ -233,6 +233,22 @@ describe("startAuthFlow", () => {
     expect(browser.runtime.openOptionsPage).toHaveBeenCalled();
   });
 
+  it("leaves the options page closed when openOptions is false (toast-initiated login)", async () => {
+    vi.mocked(browser.identity.launchWebAuthFlow).mockImplementation(
+      async (details) => {
+        const state = new URL(details.url).searchParams.get("state");
+        return `${REDIRECT}?code=auth-code&state=${state}`;
+      },
+    );
+    vi.mocked(api.exchangeCode).mockResolvedValue(tokenSet());
+    vi.mocked(api.fetchProfile).mockResolvedValue(profile);
+
+    await startAuthFlow({ openOptions: false });
+
+    expect(storage.setProfile).toHaveBeenCalledWith(profile);
+    expect(browser.runtime.openOptionsPage).not.toHaveBeenCalled();
+  });
+
   it("rejects a state mismatch as a CSRF failure and stores nothing", async () => {
     vi.mocked(browser.identity.launchWebAuthFlow).mockResolvedValue(
       `${REDIRECT}?code=auth-code&state=attacker-supplied`,

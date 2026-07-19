@@ -190,6 +190,24 @@ export function successDeepLink(mapId: number): string {
   return `${CTM_BASE_URL}/maps/${mapId}`;
 }
 
+// ─── Sign-in prompt ──────────────────────────────────────────────────────────
+// Copy for the inline Connect card the toast shows when the send flow hits a
+// logged-out (or token-rejected) state. Neutral about *why* — it serves both a
+// never-signed-in user and an expired session.
+
+export function signInTitle(): string {
+  return "Connect to Color The Map";
+}
+
+export function signInMessage(fileCount: number): string {
+  const files = fileCount === 1 ? "this file" : `these ${fileCount} files`;
+  return `Sign in to send ${files} to your maps.`;
+}
+
+export function signInRetryMessage(): string {
+  return "That didn't finish. Try connecting again.";
+}
+
 // ─── Outcome ─────────────────────────────────────────────────────────────────
 
 // One failed file, split into its name and reason so the toast can present
@@ -208,8 +226,6 @@ export interface OutcomeCard {
   details: FailureDetail[];
   // Whether to offer the "Open your map" link (something landed on the map).
   showMapLink: boolean;
-  // An extra action beyond Done, e.g. re-authenticating.
-  action: { label: string; kind: "sign-in" } | null;
 }
 
 // Splits a "name: reason" failure line into its parts. The upload path emits
@@ -263,7 +279,6 @@ export function describeUploadOutcome(
       message: `Color The Map didn't find anything to import to ${mapName}.`,
       details: [],
       showMapLink: false,
-      action: null,
     };
   }
 
@@ -275,7 +290,6 @@ export function describeUploadOutcome(
       message: tally,
       details: [],
       showMapLink: true,
-      action: null,
     };
   }
 
@@ -289,7 +303,6 @@ export function describeUploadOutcome(
       message: tally,
       details: failures,
       showMapLink: true,
-      action: null,
     };
   }
 
@@ -307,7 +320,6 @@ export function describeUploadOutcome(
         : "Color The Map couldn't read it. Double-check it and try again.",
     details: failures,
     showMapLink: false,
-    action: null,
   };
 }
 
@@ -323,13 +335,15 @@ export function translateFailureReason(
 ): OutcomeCard {
   switch (reason) {
     case "sign-in-required":
+      // Fallback only — the toast intercepts this reason and shows its inline
+      // Connect card instead of routing here. Kept neutral (no "session
+      // expired") and actionless in case some path ever renders it directly.
       return {
         tone: "error",
-        title: "Please sign in again",
-        message: "Your Color The Map session expired. Sign in and try again.",
+        title: "Sign in to Color The Map",
+        message: "Sign in and try again.",
         details: [],
         showMapLink: false,
-        action: { label: "Sign in", kind: "sign-in" },
       };
     case "network":
       return {
@@ -338,7 +352,6 @@ export function translateFailureReason(
         message: "Check your connection and give it another try.",
         details: [],
         showMapLink: false,
-        action: null,
       };
     case "permission-denied":
       return {
@@ -348,7 +361,6 @@ export function translateFailureReason(
           "Color The Map needs your OK to read that file. Try again to allow it.",
         details: [],
         showMapLink: false,
-        action: null,
       };
     case "server":
       return {
@@ -360,7 +372,6 @@ export function translateFailureReason(
             : "Color The Map couldn't add your file. Please try again.",
         details: [],
         showMapLink: false,
-        action: null,
       };
     case "unknown":
       return {
@@ -369,7 +380,6 @@ export function translateFailureReason(
         message: "Something went wrong. Please try again.",
         details: [],
         showMapLink: false,
-        action: null,
       };
   }
 }

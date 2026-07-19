@@ -11,7 +11,7 @@ export function handleAuthMessage(
   if (!isAuthMessage(message)) return undefined;
   switch (message.type) {
     case AUTH_MESSAGE_TYPES.startAuth:
-      return startAuthFlow();
+      return startAuthFlow({ openOptions: message.openOptions ?? true });
     case AUTH_MESSAGE_TYPES.logout:
       return logout();
     case AUTH_MESSAGE_TYPES.getAuthState:

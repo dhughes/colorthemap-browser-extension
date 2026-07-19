@@ -92,7 +92,9 @@ async function doRefresh(tokens: Tokens): Promise<TokenSet> {
   return next;
 }
 
-export async function startAuthFlow(): Promise<void> {
+export async function startAuthFlow({
+  openOptions = true,
+}: { openOptions?: boolean } = {}): Promise<void> {
   // verifier/state/redirectUri live only in this SW invocation. launchWebAuthFlow
   // keeps the flow in a browser window, but if the MV3 service worker is evicted
   // mid-flow the in-flight exchange is lost and the user just re-clicks Connect.
@@ -150,10 +152,14 @@ export async function startAuthFlow(): Promise<void> {
 
   await broadcastAuthState({ status: "authenticated", profile });
 
-  // The OAuth window just closed with no other signal. Bring the settings page
-  // forward (focuses the existing tab, or opens one) so the user lands on their
-  // now-connected state instead of wondering whether anything happened.
-  await browser.runtime.openOptionsPage();
+  // The OAuth window just closed with no other signal. When the flow was
+  // launched from the settings page, bring it forward (focuses the existing
+  // tab, or opens one) so the user lands on their now-connected state. A
+  // toast-initiated login skips this — the toast resumes in place on the tab
+  // the user was already on.
+  if (openOptions) {
+    await browser.runtime.openOptionsPage();
+  }
 }
 
 export async function logout(): Promise<void> {

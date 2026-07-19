@@ -15,6 +15,48 @@ Guidance for Claude Code when working in this repo. Sibling to (and modeled on) 
 - **Take non-blocking PR feedback seriously.** Reviewer "nit" or "non-blocking" comments still represent real quality concerns. Apply them unless you genuinely disagree (and then push back with reasoning, not reflexively).
 - **When in doubt, ask the user.** Use `AskUserQuestion` rather than silently deciding.
 
+## Commit & Release Conventions
+
+**CRITICAL:** This repo releases through [release-please](https://github.com/googleapis/release-please). Versioning, `CHANGELOG.md`, git tags, and GitHub Releases are all automated from commit messages. That automation only works if every merge is a valid [Conventional Commit](https://www.conventionalcommits.org/) — the rules below are **not optional**.
+
+### PR titles are the contract
+
+PRs are **squash-merged**, and the repo is configured so the **squash commit title = the PR title**. That title is what release-please parses, so **the PR title MUST be a valid Conventional Commit**:
+
+```
+type(optional-scope): subject
+```
+
+The `pr-title.yml` workflow fails any PR whose title doesn't match. Allowed types and their effect on the next version:
+
+| Type | Version bump | Changelog |
+| --- | --- | --- |
+| `feat` | **minor** (0.1.0 → 0.2.0) | Features |
+| `fix` | **patch** (0.1.0 → 0.1.1) | Bug Fixes |
+| `perf` | patch | Performance Improvements |
+| `revert` | patch | Reverts |
+| `refactor`, `docs`, `build`, `ci`, `test` | none | shown |
+| `chore`, `style` | none | hidden |
+
+A `!` after the type (e.g. `feat!:`) or a `BREAKING CHANGE:` footer forces a **major** bump.
+
+- The old `[#NN]` prefix is gone. Link the issue with `Closes #NN` in the **PR body**, not the title. (GitHub appends the PR number to the squash title automatically.)
+- Scopes are optional and freeform, e.g. `feat(detection): …`.
+
+Examples: `feat: detect Strava GPX exports` (minor) · `fix(auth): refresh before expiry` (patch) · `feat!: drop Manifest V2 support` (major) · `docs: expand the release runbook` (no release).
+
+### Never hand-edit `CHANGELOG.md`
+
+release-please **owns** `CHANGELOG.md` — it regenerates the file from commit history inside its release PR. **Do not touch it in a feature PR.** Hand-edits conflict with release-please's bookkeeping and corrupt the changelog. Write a good PR title and the changelog writes itself.
+
+### How a release happens
+
+1. Merge conventional-commit PRs into `main` as usual.
+2. release-please keeps a **release PR** open that bumps `package.json` + `CHANGELOG.md`.
+3. **Merge that release PR** → release-please tags `vX.Y.Z`, creates the GitHub Release, and `release-please.yml` builds and attaches `chrome.zip` / `edge.zip` / `firefox.zip`.
+
+You never run `git tag` by hand. The build stamps the version into each `manifest.json` from `package.json` (source of truth, kept in sync by release-please); `manifest.base.json`'s `0.0.0` is a placeholder the build always overrides.
+
 ## Project Overview
 
 Cross-browser WebExtension (Manifest V3) that detects GPS file downloads (GPX / FIT / TCX / KML / KMZ) on any site and offers to import them into [Color The Map](https://github.com/dhughes/color-the-map).

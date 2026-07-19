@@ -135,6 +135,20 @@ Connect will succeed there:
 The CTM **dev** environment needs the dev URIs; the CTM **prod** environment
 needs prod + dev (so a real unpacked extension can be tested against prod).
 
+## Releases
+
+Releases are automated with [release-please](https://github.com/googleapis/release-please) and driven entirely by [Conventional Commit](https://www.conventionalcommits.org/) PR titles (see the commit conventions in `CLAUDE.md`). There is **no manual tagging**.
+
+1. Merge PRs into `main`. Each PR is squash-merged and its title is a Conventional Commit (`feat:`, `fix:`, …): `feat` triggers a minor bump, `fix` a patch, and a `!` / `BREAKING CHANGE` a major.
+2. release-please maintains an open **release PR** that bumps the version in `package.json` and updates `CHANGELOG.md` from those commits.
+3. When you're ready to ship, **merge the release PR**. release-please tags the commit `vX.Y.Z`, publishes a GitHub Release with generated notes, and the workflow re-runs the full checks, builds all three browsers, and attaches `chrome.zip`, `edge.zip`, and `firefox.zip`.
+
+The git tag drives nothing on its own — the version is stamped into each `manifest.json` at build time from `package.json` (which release-please keeps in sync). Local `npm run build` without a release stamps whatever `package.json` currently holds (default `0.0.0`). At runtime the extension reads its own version via `browser.runtime.getManifest().version`.
+
+**For testers:** grab the latest zip from the [Releases page](https://github.com/dhughes/colorthemap-browser-extension/releases) and load it unpacked (see [Load the unpacked extension](#load-the-unpacked-extension) above) — no store review queue required.
+
+> **Repo settings this relies on** (already configured): squash-merge only with the PR title as the squash commit title, and **Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests"** enabled, so release-please can open its release PR.
+
 ## What's next
 
 Each of these will be a separate issue + branch:

@@ -5,26 +5,24 @@ on:
     types: [opened, edited, synchronize, reopened]
 
 permissions:
-  pull-requests: read
+  contents: read
 
 jobs:
   validate:
     name: Conventional Commit title
     runs-on: ubuntu-latest
     steps:
-      - uses: amannn/action-semantic-pull-request@v5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          types: |
-            feat
-            fix
-            docs
-            chore
-            refactor
-            test
-            ci
-            build
-            perf
-            style
-            revert
+          node-version-file: '.nvmrc'
+
+      - name: Validate PR title
+        # The title is passed via env, never interpolated into the shell, so a
+        # crafted title can't inject commands. The check is a committed,
+        # zero-dependency script — no third-party Action in the loop.
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: node scripts/check-pr-title.ts

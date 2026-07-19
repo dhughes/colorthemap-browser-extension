@@ -9,6 +9,7 @@
     "generate:theme": "node scripts/generate-theme.ts",
     "generate:theme:check": "node scripts/generate-theme.ts --check",
     "validate:theme": "node scripts/check-theme-generated.ts",
+    "check:pr-title": "node scripts/check-pr-title.ts",
     "predev": "node scripts/generate-theme.ts",
     "prebuild": "node scripts/generate-theme.ts",
     "build": "npm run clean && npm run build:chrome && npm run build:edge && npm run build:firefox",

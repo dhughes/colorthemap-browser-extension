@@ -134,7 +134,14 @@ async function resolveAndValidate(
 function classifyFailure(error: unknown): UploadFailureReason {
   if (error instanceof TokenExpired) return "sign-in-required";
   if (error instanceof UploadNetworkError) return "network";
-  if (error instanceof UploadServerError) return "server";
+  // A 401 means CTM rejected the token (expired/revoked but not yet locally
+  // stale). Route it to the sign-in prompt like a missing token — not the raw
+  // server-error path, which surfaces CTM's message verbatim. 403 stays a
+  // server error: authenticated but forbidden (e.g. not your map), where
+  // re-authenticating wouldn't help.
+  if (error instanceof UploadServerError) {
+    return error.status === 401 ? "sign-in-required" : "server";
+  }
   return "unknown";
 }
 

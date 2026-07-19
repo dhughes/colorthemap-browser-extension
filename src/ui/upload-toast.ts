@@ -1,4 +1,9 @@
 import browser from "webextension-polyfill";
+import {
+  getAuthStateMessage,
+  startAuthMessage,
+  type AuthState,
+} from "../auth/messages";
 import { base64ToBytes } from "../shared/base64";
 import { getFormatSpec } from "../shared/formats";
 import { matchesFormat } from "../shared/sniff";
@@ -25,6 +30,9 @@ import {
   resolveInitialMapId,
   resumeCountdown,
   sendButtonLabel,
+  signInMessage,
+  signInRetryMessage,
+  signInTitle,
   startCountdown,
   successDeepLink,
   translateFailureReason,
@@ -51,8 +59,9 @@ const HOST_URLS_ATTR = "data-ctm-urls";
 // live host controller (which was created by whichever bundle detected first).
 const ADD_FILE_EVENT = "ctm:toast-add-file";
 
-const OFFER_COUNTDOWN_MS = 15_000;
-const SUCCESS_COUNTDOWN_MS = 10_000;
+// One auto-dismiss duration for every countdown surface (offer, sign-in,
+// success). Hover pauses it; engaging (focus/pointer) cancels it outright.
+const COUNTDOWN_MS = 10_000;
 
 // Firefox aborts an in-flight fetch when a link's own download starts in the
 // same tick (Chrome doesn't). Retry once after the download is dispatched.
@@ -219,6 +228,8 @@ type ToastPhase =
   | "loading"
   | "no-maps"
   | "offer"
+  | "sign-in"
+  | "authenticating"
   | "sending"
   | "success"
   | "error";
@@ -239,6 +250,10 @@ class ToastCard {
   private phase: ToastPhase = "loading";
   private countdown: CountdownState | null = null;
   private raf: number | null = null;
+  // A send that hit a logged-out state and is waiting for the user to connect,
+  // so it can be resumed verbatim afterward. Null when there's nothing pending.
+  private pendingSend: { mapId: number; files: DetectedFile[] } | null = null;
+  private disposed = false;
 
   constructor(
     first: DetectedFile,
@@ -324,6 +339,10 @@ class ToastCard {
       return;
     }
     if (!result.ok) {
+      if (result.reason === "sign-in-required") {
+        this.renderSignIn();
+        return;
+      }
       this.renderOutcome(translateFailureReason(result.reason), null);
       return;
     }
@@ -385,7 +404,7 @@ class ToastCard {
     this.footer.replaceChildren(dismiss, send);
 
     if (this.countdown === null) {
-      this.countdown = startCountdown(OFFER_COUNTDOWN_MS, now());
+      this.countdown = startCountdown(COUNTDOWN_MS, now());
     }
     this.showBarIfRunning();
   }
@@ -498,6 +517,13 @@ class ToastCard {
       this.renderOutcome(translateFailureReason("unknown"), null);
       return;
     }
+    if (result.status === "error" && result.reason === "sign-in-required") {
+      // CTM rejected the token mid-send. Hold this exact send and prompt the
+      // user to connect; resumeAfterAuth replays it once they're back.
+      this.pendingSend = { mapId, files };
+      this.renderSignIn();
+      return;
+    }
     if (result.status === "done" && droppedLocally > 0) {
       result = {
         ...result,
@@ -525,6 +551,104 @@ class ToastCard {
       return bytesBase64 === null ? null : { ...toInput(file), bytesBase64 };
     }
     return toInput(file);
+  }
+
+  // The logged-out (or token-rejected) state: an inline Connect CTA in place of
+  // the raw error the send flow used to surface. It auto-dismisses like the
+  // offer — an ignored card times out. Clicking Connect enters the
+  // authenticating phase, which freezes the timer for the OAuth round trip.
+  private renderSignIn({ retry = false }: { retry?: boolean } = {}): void {
+    this.setPhase("sign-in");
+    this.title.textContent = signInTitle();
+    const message = el("p", "text-secondary text-text-muted");
+    message.textContent = retry
+      ? signInRetryMessage()
+      : signInMessage(this.files.length);
+    this.body.replaceChildren(message);
+
+    const dismiss = button(
+      `${buttonClass({ emphasis: "secondary" })} flex-1`,
+      "No thanks",
+      () => this.dismiss(),
+    );
+    const connect = button(
+      `${buttonClass({ tone: "primary" })} flex-1`,
+      "Connect",
+      () => this.connect(),
+    );
+    this.footer.replaceChildren(dismiss, connect);
+
+    this.countdown = startCountdown(COUNTDOWN_MS, now());
+    this.showBarIfRunning();
+  }
+
+  private renderAuthenticating(): void {
+    this.setPhase("authenticating");
+    // Freeze auto-dismiss: the user is away completing OAuth (~a minute) and the
+    // card must still be here when they return.
+    this.countdown = null;
+    this.body.replaceChildren(spinnerRow("Connecting…"));
+    this.footer.replaceChildren();
+    this.hideBar();
+  }
+
+  private connect(): void {
+    if (this.phase !== "sign-in") {
+      return;
+    }
+    void this.runConnect();
+  }
+
+  // Launches OAuth in the background SW (openOptions:false keeps the user on
+  // this tab), then treats getAuthState as the source of truth: the start-auth
+  // promise can reject on a benign window-close or an SW eviction, so the
+  // re-query — not the promise's fate — decides success.
+  private async runConnect(): Promise<void> {
+    this.renderAuthenticating();
+    try {
+      await browser.runtime.sendMessage(
+        startAuthMessage({ openOptions: false }),
+      );
+    } catch (error) {
+      console.warn("[ctm] sign-in did not complete", error);
+    }
+    if (this.disposed) {
+      return;
+    }
+    if (await this.isSignedIn()) {
+      await this.resumeAfterAuth();
+    } else {
+      this.renderSignIn({ retry: true });
+    }
+  }
+
+  private async isSignedIn(): Promise<boolean> {
+    try {
+      const state = (await browser.runtime.sendMessage(
+        getAuthStateMessage(),
+      )) as AuthState | undefined;
+      return state?.status === "authenticated";
+    } catch {
+      return false;
+    }
+  }
+
+  private async resumeAfterAuth(): Promise<void> {
+    if (this.disposed) {
+      return;
+    }
+    const pending = this.pendingSend;
+    this.pendingSend = null;
+    if (pending) {
+      // The user already picked a map and granted any host permission before
+      // the token was rejected — replay that send (permission still held, so
+      // pass a resolved grant rather than re-prompting outside a gesture).
+      await this.runSend(pending.mapId, pending.files, Promise.resolve(true));
+    } else {
+      // Never got as far as an offer — reload maps and land on the normal
+      // offer for the user to pick a map and Send.
+      await this.loadMaps();
+    }
   }
 
   private renderSending(): void {
@@ -566,18 +690,14 @@ class ToastCard {
     }
     this.body.replaceChildren(...body);
 
-    // The primary action, if any: open the map (success) or sign in again (an
-    // expired session). It pairs with Done as two equal pills; a plain outcome
-    // gets a lone full-width Done.
+    // The primary action, if any: open the map when something landed. It pairs
+    // with Done as two equal pills; a plain outcome gets a lone full-width Done.
+    // (The logged-out path no longer reaches here — the toast shows its inline
+    // Connect card instead, see renderSignIn.)
     const primary =
       card.showMapLink && mapId !== null
         ? { href: successDeepLink(mapId), label: "Open your map" }
-        : card.action?.kind === "sign-in"
-          ? {
-              href: browser.runtime.getURL("options.html"),
-              label: card.action.label,
-            }
-          : null;
+        : null;
 
     if (primary) {
       this.footer.replaceChildren(
@@ -602,7 +722,7 @@ class ToastCard {
       this.countdown = null;
       this.hideBar();
     } else {
-      this.countdown = startCountdown(SUCCESS_COUNTDOWN_MS, now());
+      this.countdown = startCountdown(COUNTDOWN_MS, now());
       this.showBarIfRunning();
     }
   }
@@ -709,6 +829,7 @@ class ToastCard {
   }
 
   private remove(): void {
+    this.disposed = true;
     this.card.remove();
     this.onDispose();
   }
@@ -827,8 +948,8 @@ function anchor(href: string, text: string): HTMLAnchorElement {
   return node;
 }
 
-// An anchor wearing a button look — for the "Open your map" / "Sign in"
-// actions, which navigate rather than run a handler.
+// An anchor wearing a button look — for the "Open your map" action, which
+// navigates rather than runs a handler.
 function anchorButton(
   href: string,
   text: string,

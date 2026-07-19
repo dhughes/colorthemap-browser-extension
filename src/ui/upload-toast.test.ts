@@ -318,21 +318,6 @@ describe("send", () => {
     expect(rows[0]!.textContent).toContain("couldn't read a track");
   });
 
-  it("re-authenticates via the options page on an expired session", async () => {
-    uploadResult({ status: "error", reason: "sign-in-required" });
-    openUploadToast(file());
-    await waitForPhase(newestCard(), "offer");
-
-    q(newestCard(), "button.bg-magenta-500").click();
-    await waitForPhase(newestCard(), "error");
-
-    const signIn = q<HTMLAnchorElement>(
-      newestCard(),
-      "a[href*='options.html']",
-    );
-    expect(signIn.textContent).toContain("Sign in");
-  });
-
   it("blames the connection, not permissions, when a same-origin file can't be read", async () => {
     vi.stubGlobal(
       "fetch",
@@ -349,6 +334,124 @@ describe("send", () => {
     const text = newestCard().textContent?.toLowerCase() ?? "";
     expect(text).toContain("connection");
     expect(text).not.toContain("permission");
+  });
+});
+
+describe("sign-in flow (#19)", () => {
+  // Wires the four message types the sign-in flow exercises. `signedIn` and
+  // `startAuth` are mutable so a test can flip auth state as the flow runs.
+  function wire(opts: {
+    signedIn: () => boolean;
+    onStartAuth?: () => void;
+    upload?: () => unknown;
+  }): void {
+    sendMessage.mockImplementation(async (message: unknown) => {
+      const type = (message as { type: string }).type;
+      if (type === "ctm:list-maps") {
+        return opts.signedIn()
+          ? { ok: true, maps: [{ id: 1, name: "Trails" }] }
+          : { ok: false, reason: "sign-in-required" };
+      }
+      if (type === "ctm:start-auth") {
+        opts.onStartAuth?.();
+        return undefined;
+      }
+      if (type === "ctm:get-auth-state") {
+        return opts.signedIn()
+          ? { status: "authenticated", profile: {} }
+          : { status: "unauthenticated" };
+      }
+      if (type === "ctm:upload") return opts.upload?.();
+      return undefined;
+    });
+  }
+
+  const connectButton = (card: HTMLElement): HTMLButtonElement =>
+    q<HTMLButtonElement>(card, "button.bg-magenta-500");
+
+  it("offers a Connect card — not an options anchor — when the user is signed out", async () => {
+    wire({ signedIn: () => false });
+    openUploadToast(file());
+    await waitForPhase(newestCard(), "sign-in");
+
+    expect(newestCard().textContent).toContain("Connect to Color The Map");
+    expect(connectButton(newestCard()).textContent).toContain("Connect");
+    expect(newestCard().querySelector("a[href*='options.html']")).toBeNull();
+    // Idle Connect card auto-dismisses like the offer.
+    expect(newestCard().dataset.countdown).toBe("running");
+  });
+
+  it("launches OAuth in place (no options-page hop) and lands on the offer once signed in", async () => {
+    let signedIn = false;
+    wire({
+      signedIn: () => signedIn,
+      onStartAuth: () => {
+        signedIn = true;
+      },
+    });
+    openUploadToast(file());
+    await waitForPhase(newestCard(), "sign-in");
+
+    connectButton(newestCard()).click();
+    expect(newestCard().dataset.phase).toBe("authenticating");
+    // Auto-dismiss is frozen while the user is away completing OAuth.
+    expect(newestCard().dataset.countdown).toBe("none");
+
+    await waitForPhase(newestCard(), "offer");
+    expect(newestCard().textContent).toContain("Trails");
+    expect(sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "ctm:start-auth", openOptions: false }),
+    );
+  });
+
+  it("returns to a retriable Connect card when sign-in doesn't complete", async () => {
+    wire({ signedIn: () => false });
+    openUploadToast(file());
+    await waitForPhase(newestCard(), "sign-in");
+
+    connectButton(newestCard()).click();
+
+    await vi.waitFor(() =>
+      expect(newestCard().textContent?.toLowerCase()).toContain(
+        "try connecting again",
+      ),
+    );
+    expect(newestCard().dataset.phase).toBe("sign-in");
+  });
+
+  it("resumes the interrupted upload after signing in (token rejected mid-send)", async () => {
+    let signedIn = true; // token present at mount, rejected at upload
+    let uploadCalls = 0;
+    wire({
+      signedIn: () => signedIn,
+      onStartAuth: () => {
+        signedIn = true;
+      },
+      upload: () => {
+        uploadCalls += 1;
+        return uploadCalls === 1
+          ? { status: "error", reason: "sign-in-required" }
+          : {
+              status: "done",
+              uploaded: 1,
+              duplicates: 0,
+              failed: 0,
+              total: 1,
+              errors: [],
+            };
+      },
+    });
+    openUploadToast(file());
+    await waitForPhase(newestCard(), "offer");
+
+    connectButton(newestCard()).click(); // Send
+    await waitForPhase(newestCard(), "sign-in"); // upload came back 401
+
+    connectButton(newestCard()).click(); // Connect
+    await waitForPhase(newestCard(), "success");
+
+    expect(newestCard().textContent).toContain("You're on the map");
+    expect(uploadCalls).toBe(2); // the send was retried, not dropped
   });
 });
 

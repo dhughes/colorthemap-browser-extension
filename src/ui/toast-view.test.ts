@@ -13,6 +13,9 @@ import {
   resolveInitialMapId,
   resumeCountdown,
   sendButtonLabel,
+  signInMessage,
+  signInRetryMessage,
+  signInTitle,
   startCountdown,
   successDeepLink,
   translateFailureReason,
@@ -244,6 +247,21 @@ describe("successDeepLink", () => {
   });
 });
 
+describe("sign-in copy", () => {
+  it("invites the user to connect", () => {
+    expect(signInTitle().toLowerCase()).toContain("connect");
+  });
+
+  it("says what will be sent, singular and plural", () => {
+    expect(signInMessage(1).toLowerCase()).toContain("file");
+    expect(signInMessage(3)).toContain("3");
+  });
+
+  it("offers a retry after an abandoned or failed sign-in", () => {
+    expect(signInRetryMessage().toLowerCase()).toContain("try");
+  });
+});
+
 describe("describeUploadOutcome", () => {
   const done = (
     over: Partial<UploadResult & { status: "done" }> = {},
@@ -348,21 +366,19 @@ describe("describeUploadOutcome", () => {
       "Trails",
     );
     expect(card.tone).toBe("error");
-    expect(card.action).toEqual({ label: "Sign in", kind: "sign-in" });
     expect(card.showMapLink).toBe(false);
   });
 });
 
 describe("translateFailureReason", () => {
-  it("asks the user to sign in again on an expired session", () => {
+  it("keeps a neutral sign-in fallback (the toast drives the real prompt)", () => {
     const card = translateFailureReason("sign-in-required");
-    expect(card.action).toEqual({ label: "Sign in", kind: "sign-in" });
+    expect(card.tone).toBe("error");
     expect(card.message.toLowerCase()).toContain("sign in");
   });
 
   it("names a connection problem on a network failure", () => {
     const card = translateFailureReason("network");
-    expect(card.action).toBeNull();
     expect(card.message.toLowerCase()).toContain("connection");
   });
 
@@ -377,7 +393,6 @@ describe("translateFailureReason", () => {
     for (const reason of ["server", "unknown"] as const) {
       const card = translateFailureReason(reason);
       expect(card.tone).toBe("error");
-      expect(card.action).toBeNull();
       expect(card.message).toBeTruthy();
     }
   });

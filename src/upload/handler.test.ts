@@ -72,6 +72,24 @@ describe("list-maps", () => {
 
     expect(result).toMatchObject({ ok: false, reason: "network" });
   });
+
+  it("treats a 401 from CTM as sign-in-required, not a raw server error", async () => {
+    mocked.fetchMaps.mockRejectedValue(
+      new UploadServerError(401, "Not authenticated"),
+    );
+
+    const result = await handleUploadMessage(listMapsMessage());
+
+    expect(result).toMatchObject({ ok: false, reason: "sign-in-required" });
+  });
+
+  it("keeps a 403 as a server error (authenticated but forbidden)", async () => {
+    mocked.fetchMaps.mockRejectedValue(new UploadServerError(403, "Forbidden"));
+
+    const result = await handleUploadMessage(listMapsMessage());
+
+    expect(result).toMatchObject({ ok: false, reason: "server" });
+  });
 });
 
 describe("upload (batch)", () => {
@@ -237,6 +255,22 @@ describe("upload (batch)", () => {
     );
 
     expect(result).toMatchObject({ status: "error", reason: "server" });
+  });
+
+  it("treats a 401 from CTM as sign-in-required", async () => {
+    mocked.fetchFileBytes.mockResolvedValue(gpxBytes());
+    mocked.uploadTracks.mockRejectedValue(
+      new UploadServerError(401, "Not authenticated"),
+    );
+
+    const result = await handleUploadMessage(
+      uploadMessage({ mapId: 1, files: [file()] }),
+    );
+
+    expect(result).toMatchObject({
+      status: "error",
+      reason: "sign-in-required",
+    });
   });
 
   it("classifies an unexpected error as unknown", async () => {

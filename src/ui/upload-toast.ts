@@ -948,8 +948,8 @@ function anchor(href: string, text: string): HTMLAnchorElement {
   return node;
 }
 
-// An anchor wearing a button look — for the "Open your map" / "Sign in"
-// actions, which navigate rather than run a handler.
+// An anchor wearing a button look — for the "Open your map" action, which
+// navigates rather than runs a handler.
 function anchorButton(
   href: string,
   text: string,

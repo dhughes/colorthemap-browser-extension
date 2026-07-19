@@ -82,9 +82,10 @@ export function originsNeedingPermission(
 }
 
 // ─── Countdown ───────────────────────────────────────────────────────────────
-// A duration-agnostic drain timer, reused for the offer (15s) and success (10s)
-// windows. Every time-sensitive function takes `now` explicitly so the logic is
-// testable without real clocks. Elapsed time is banked across pause segments:
+// A duration-agnostic drain timer, reused across the offer, sign-in, and
+// success windows (all 10s — see COUNTDOWN_MS in upload-toast.ts). Every
+// time-sensitive function takes `now` explicitly so the logic is testable
+// without real clocks. Elapsed time is banked across pause segments:
 // while running it accrues from `segmentStartedAt`; while paused/canceled it's
 // frozen at `consumedMs`.
 

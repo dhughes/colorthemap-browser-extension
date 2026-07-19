@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/dhughes/colorthemap-browser-extension/compare/v0.1.0...v0.2.0) (2026-07-19)
+
+
+### Features
+
+* prompt sign-in when sending to Color The Map while logged out ([#35](https://github.com/dhughes/colorthemap-browser-extension/issues/35)) ([37300f4](https://github.com/dhughes/colorthemap-browser-extension/commit/37300f4affb323a894745fbe797ea1a60a3ff03d))
+
 ## 0.1.0 (2026-07-19)
 
 

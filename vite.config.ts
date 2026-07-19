@@ -3,8 +3,16 @@ import { defineConfig } from "vite";
 import webExtension, { readJsonFile } from "vite-plugin-web-extension";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { toManifestVersion } from "./scripts/manifest-version";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
+
+// Version flows from package.json — release-please bumps it on release, and local
+// builds read whatever's committed (defaulting to 0.0.0). The build stamps it into
+// every browser's manifest, overriding the placeholder in manifest.base.json.
+const manifestVersion = toManifestVersion(
+  (readJsonFile(resolve(root, "package.json")) as { version: string }).version,
+);
 
 // `vite build --watch` re-runs the plugin's buildStart on every rebuild, which
 // empties the outDir when emptyOutDir is set — leaving a window where the loaded
@@ -40,6 +48,7 @@ if (!isTarget(target)) {
 // Chrome and Edge share the base shape.
 function generateManifest() {
   const base = readJsonFile(resolve(root, "manifest.base.json"));
+  base.version = manifestVersion;
   if (target === "firefox") {
     const firefoxManifest = {
       ...base,

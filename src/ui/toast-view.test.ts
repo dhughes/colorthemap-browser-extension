@@ -186,13 +186,18 @@ describe("originsNeedingPermission", () => {
         file({ url: "https://b.example/z.gpx" }),
       ],
       PAGE,
+      false,
     );
     expect(origins).toEqual(["https://a.example/*", "https://b.example/*"]);
   });
 
   it("excludes same-origin files (the content script reads them)", () => {
     expect(
-      originsNeedingPermission([file({ url: `${PAGE}/local.gpx` })], PAGE),
+      originsNeedingPermission(
+        [file({ url: `${PAGE}/local.gpx` })],
+        PAGE,
+        false,
+      ),
     ).toEqual([]);
   });
 
@@ -201,6 +206,7 @@ describe("originsNeedingPermission", () => {
       originsNeedingPermission(
         [file({ url: "https://a.example/x.gpx", bytesBase64: "PGdweC8+" })],
         PAGE,
+        false,
       ),
     ).toEqual([]);
   });
@@ -208,15 +214,36 @@ describe("originsNeedingPermission", () => {
   it("strips the port from the match pattern", () => {
     expect(
       originsNeedingPermission(
+        [file({ url: "https://cdn.example:8443/x.gpx" })],
+        PAGE,
+        false,
+      ),
+    ).toEqual(["https://cdn.example/*"]);
+  });
+
+  it("excludes an internal/loopback target when private hosts aren't allowed", () => {
+    expect(
+      originsNeedingPermission(
         [file({ url: "http://127.0.0.1:8080/x.gpx" })],
         PAGE,
+        false,
+      ),
+    ).toEqual([]);
+  });
+
+  it("includes an internal target when private hosts are allowed", () => {
+    expect(
+      originsNeedingPermission(
+        [file({ url: "http://127.0.0.1:8080/x.gpx" })],
+        PAGE,
+        true,
       ),
     ).toEqual(["http://127.0.0.1/*"]);
   });
 
   it("skips an unparseable URL", () => {
     expect(
-      originsNeedingPermission([file({ url: "not a url" })], PAGE),
+      originsNeedingPermission([file({ url: "not a url" })], PAGE, false),
     ).toEqual([]);
   });
 });

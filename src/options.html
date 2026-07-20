@@ -68,6 +68,37 @@
           Per-site import preferences will live here in a later release.
         </p>
       </section>
+
+      <section id="danger-zone">
+        <h2
+          class="mt-8 mb-3 text-micro font-semibold tracking-micro uppercase text-alert-error"
+        >
+          Dangerous features
+        </h2>
+        <p id="danger-warning" class="mb-4">
+          Don't enable these unless you know exactly why. They loosen the
+          extension's safety limits.
+        </p>
+        <label class="flex items-start gap-3">
+          <input
+            id="allow-private-hosts"
+            type="checkbox"
+            class="mt-1 size-4 shrink-0 accent-magenta-500"
+          />
+          <span>
+            <span class="font-semibold"
+              >Allow importing from private network addresses</span
+            >
+            <span class="mt-0.5 block text-secondary text-text-muted">
+              Lets the extension fetch GPS files from localhost and private/LAN
+              addresses (for example, a self-hosted service). This weakens the
+              guard against a malicious page using the extension to probe your
+              local network — leave it off unless you're testing or
+              self-hosting.
+            </span>
+          </span>
+        </label>
+      </section>
     </div>
 
     <script type="module" src="./options.ts"></script>

@@ -6,10 +6,12 @@ vi.mock("./service", () => ({
   fetchFileBytes: vi.fn(),
   uploadTracks: vi.fn(),
 }));
+vi.mock("../shared/settings", () => ({ getAllowPrivateHosts: vi.fn() }));
 
 import { getAccessToken } from "../auth/service";
 import { TokenExpired } from "../auth/errors";
 import { bytesToBase64 } from "../shared/base64";
+import { getAllowPrivateHosts } from "../shared/settings";
 import { UploadNetworkError, UploadServerError } from "./errors";
 import { fetchMaps } from "./maps";
 import { handleUploadMessage } from "./handler";
@@ -21,6 +23,7 @@ const mocked = {
   fetchMaps: vi.mocked(fetchMaps),
   fetchFileBytes: vi.mocked(fetchFileBytes),
   uploadTracks: vi.mocked(uploadTracks),
+  getAllowPrivateHosts: vi.mocked(getAllowPrivateHosts),
 };
 
 const gpxBytes = () => new TextEncoder().encode("<gpx></gpx>").buffer;
@@ -35,6 +38,7 @@ const file = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mocked.getAccessToken.mockResolvedValue("access-xyz");
+  mocked.getAllowPrivateHosts.mockResolvedValue(false);
 });
 
 describe("handleUploadMessage routing", () => {
@@ -181,7 +185,9 @@ describe("upload (batch)", () => {
       failed: 1,
       total: 2,
     });
-    expect((result as { errors: string[] }).errors[0]).toContain("GPX");
+    expect((result as { errors: string[] }).errors[0]).toBe(
+      "fake.gpx couldn't be imported.",
+    );
   });
 
   it("counts one file's re-fetch failure as failed without aborting the batch", async () => {
@@ -282,5 +288,100 @@ describe("upload (batch)", () => {
     );
 
     expect(result).toMatchObject({ status: "error", reason: "unknown" });
+  });
+
+  describe("re-fetch SSRF guard", () => {
+    it("blocks an internal re-fetch target without fetching it", async () => {
+      const result = await handleUploadMessage(
+        uploadMessage({
+          mapId: 1,
+          files: [
+            file({
+              filename: "router.gpx",
+              url: "http://192.168.1.1/api/reboot?format=gpx",
+            }),
+          ],
+        }),
+      );
+
+      expect(mocked.fetchFileBytes).not.toHaveBeenCalled();
+      expect(mocked.uploadTracks).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        status: "done",
+        uploaded: 0,
+        failed: 1,
+        total: 1,
+      });
+      expect((result as { errors: string[] }).errors[0]).toBe(
+        "router.gpx couldn't be imported.",
+      );
+    });
+
+    it("re-fetches an internal target when private hosts are opted in", async () => {
+      mocked.getAllowPrivateHosts.mockResolvedValue(true);
+      mocked.fetchFileBytes.mockResolvedValue(gpxBytes());
+      mocked.uploadTracks.mockResolvedValue({
+        uploaded: 1,
+        duplicates: 0,
+        failed: 0,
+        errors: [],
+      });
+
+      await handleUploadMessage(
+        uploadMessage({
+          mapId: 1,
+          files: [file({ url: "http://localhost:8080/x.gpx" })],
+        }),
+      );
+
+      expect(mocked.fetchFileBytes).toHaveBeenCalledWith(
+        "http://localhost:8080/x.gpx",
+      );
+    });
+
+    it("never re-fetches a captured-bytes file, even from an internal URL", async () => {
+      const bytesBase64 = bytesToBase64(
+        new TextEncoder().encode("<gpx/>").buffer,
+      );
+      mocked.uploadTracks.mockResolvedValue({
+        uploaded: 1,
+        duplicates: 0,
+        failed: 0,
+        errors: [],
+      });
+
+      await handleUploadMessage(
+        uploadMessage({
+          mapId: 1,
+          files: [file({ url: "http://127.0.0.1/x.gpx", bytesBase64 })],
+        }),
+      );
+
+      expect(mocked.fetchFileBytes).not.toHaveBeenCalled();
+      expect(mocked.uploadTracks.mock.calls[0]![0].files).toHaveLength(1);
+    });
+
+    it("gives an unreachable host and a wrong-format host the same error (no oracle)", async () => {
+      mocked.fetchFileBytes
+        .mockRejectedValueOnce(new Error("connection refused"))
+        .mockResolvedValueOnce(
+          new TextEncoder().encode("<!doctype html>").buffer,
+        );
+
+      const result = await handleUploadMessage(
+        uploadMessage({
+          mapId: 1,
+          files: [
+            file({ filename: "probe.gpx", url: "https://a.example/probe.gpx" }),
+            file({ filename: "probe.gpx", url: "https://b.example/probe.gpx" }),
+          ],
+        }),
+      );
+
+      expect((result as { errors: string[] }).errors).toEqual([
+        "probe.gpx couldn't be imported.",
+        "probe.gpx couldn't be imported.",
+      ]);
+    });
   });
 });

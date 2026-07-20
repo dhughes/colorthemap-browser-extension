@@ -1,5 +1,6 @@
 import { CTM_BASE_URL } from "../auth/config";
 import type { GpsFormat } from "../shared/formats";
+import { isSafeRefetchTarget } from "../shared/refetch-safety";
 import type {
   CtmMap,
   UploadFailureReason,
@@ -56,11 +57,14 @@ export function addDetectedFile(
 // Distinct origins the background must be granted to re-fetch: files that are
 // cross-origin to the page (the content script can't read them) and carry no
 // captured bytes. Same-origin files are read by the content script itself, and
-// files with bytes need nothing. Origins are scheme+host only — match patterns
-// can't carry a port.
+// files with bytes need nothing. Internal/loopback/non-http(s) targets are
+// dropped — the background refuses them (SSRF guard), so there's no point
+// prompting for a host that can never be fetched. Origins are scheme+host only —
+// match patterns can't carry a port.
 export function originsNeedingPermission(
   files: DetectedFile[],
   pageOrigin: string,
+  allowPrivate: boolean,
 ): string[] {
   const origins = new Set<string>();
   for (const file of files) {
@@ -75,6 +79,9 @@ export function originsNeedingPermission(
     }
     if (url.origin === pageOrigin) {
       continue; // same-origin: the content script reads it
+    }
+    if (!isSafeRefetchTarget(file.url, { allowPrivate })) {
+      continue; // background will refuse this target — don't prompt for it
     }
     origins.add(`${url.protocol}//${url.hostname}/*`);
   }

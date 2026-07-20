@@ -6,6 +6,7 @@ import {
 } from "../auth/messages";
 import { base64ToBytes } from "../shared/base64";
 import { getFormatSpec } from "../shared/formats";
+import { getAllowPrivateHosts } from "../shared/settings";
 import { matchesFormat } from "../shared/sniff";
 import { getLastMapForHost, setLastMapForHost } from "../upload/last-map";
 import {
@@ -26,7 +27,6 @@ import {
   offerTitle,
   originsNeedingPermission,
   pauseCountdown,
-  resetCountdown,
   resolveInitialMapId,
   resumeCountdown,
   sendButtonLabel,
@@ -160,7 +160,11 @@ class UploadToastHost {
     // cards (pointer-events:auto) are interactive, so the page stays usable.
     this.host.style.cssText =
       "position: fixed !important; inset: 0 !important; z-index: 2147483647 !important; pointer-events: none !important;";
-    this.shadow = this.host.attachShadow({ mode: "open" });
+    // Closed so a host page can't read the toast's contents via
+    // host.shadowRoot — that readback was a recon oracle (SSRF hardening, #23).
+    // The controller keeps its own `this.shadow` handle, so nothing internal
+    // depends on the element exposing shadowRoot.
+    this.shadow = this.host.attachShadow({ mode: "closed" });
 
     const style = document.createElement("style");
     style.textContent = shadowCss;
@@ -188,22 +192,19 @@ class UploadToastHost {
   };
 
   private addFile(file: DetectedFile): void {
-    if (this.isOfferedAnywhere(file.url)) {
+    // One card per distinct file. If the same URL already has a card, only act
+    // when this arrival carries bytes the card lacked (Detector C queued the
+    // bare link, then Detector A caught the body) — upgrade it in place so Send
+    // needn't re-fetch. Otherwise it's a duplicate and we ignore it.
+    const existing = this.cards.find((card) => card.hasUrl(file.url));
+    if (existing) {
+      existing.upgradeBytes(file);
       return;
     }
-    const newest = this.cards[this.cards.length - 1];
-    if (newest?.canAccumulate()) {
-      newest.appendFile(file);
-    } else {
-      const card = new ToastCard(file, this.stack, () => this.dispose(card));
-      this.cards.push(card);
-      card.mount();
-    }
+    const card = new ToastCard(file, this.stack, () => this.dispose(card));
+    this.cards.push(card);
+    card.mount();
     this.syncOfferedUrls();
-  }
-
-  private isOfferedAnywhere(url: string): boolean {
-    return this.cards.some((card) => card.hasUrl(url));
   }
 
   private dispose(card: ToastCard): void {
@@ -247,6 +248,10 @@ class ToastCard {
   private files: DetectedFile[];
   private maps: CtmMap[] = [];
   private selectedMapId: number | null = null;
+  // Pre-loaded from storage during loadMaps so send() can read it synchronously
+  // (send() must run before its first await to keep the click-gesture token that
+  // browser.permissions.request requires).
+  private allowPrivateHosts = false;
   private phase: ToastPhase = "loading";
   private countdown: CountdownState | null = null;
   private raf: number | null = null;
@@ -294,10 +299,6 @@ class ToastCard {
     void this.loadMaps();
   }
 
-  canAccumulate(): boolean {
-    return this.phase === "offer";
-  }
-
   hasUrl(url: string): boolean {
     return this.files.some((file) => file.url === url);
   }
@@ -306,18 +307,12 @@ class ToastCard {
     return this.files.map((file) => file.url);
   }
 
-  appendFile(file: DetectedFile): void {
-    const { files, added } = addDetectedFile(this.files, file);
+  // The same URL arrived again; adopt bytes it now carries (Detector A caught the
+  // body after Detector C queued the bare link) so Send won't re-fetch. Nothing
+  // visible changes — same filename, host, format — so there's no re-render.
+  upgradeBytes(file: DetectedFile): void {
+    const { files } = addDetectedFile(this.files, file);
     this.files = files;
-    if (!added) {
-      return;
-    }
-    // Preserve status: a file arriving after the user paused (hover) or engaged
-    // (focus) must not restart the timer under them.
-    if (this.countdown !== null) {
-      this.countdown = resetCountdown(this.countdown, now());
-    }
-    this.renderOffer();
   }
 
   private readonly onKeydown = (event: KeyboardEvent): void => {
@@ -355,6 +350,7 @@ class ToastCard {
       result.maps,
       await getLastMapForHost(this.hostname),
     );
+    this.allowPrivateHosts = await getAllowPrivateHosts();
     this.renderOffer();
   }
 
@@ -412,7 +408,8 @@ class ToastCard {
   private fileList(): HTMLElement {
     const list = el("ul", "flex flex-col gap-2");
     for (const file of this.files) {
-      const row = el("li", "flex items-center gap-2");
+      const row = el("li", "flex flex-col gap-0.5");
+      const top = el("div", "flex items-center gap-2");
       const name = el(
         "span",
         "min-w-0 flex-1 truncate text-secondary text-text",
@@ -421,7 +418,15 @@ class ToastCard {
       name.title = file.filename;
       const badge = el("span", formatBadgeClass);
       badge.textContent = getFormatSpec(file.format).label;
-      row.append(name, badge);
+      top.append(name, badge);
+
+      // Name the source host so it's obvious where a file would be fetched
+      // from — the URL isn't otherwise visible, and a link can point anywhere.
+      const source = el("span", "truncate text-secondary text-text-muted");
+      source.textContent = `from ${hostForDisplay(file.url)}`;
+      source.title = file.url;
+
+      row.append(top, source);
       list.append(row);
     }
     return list;
@@ -466,7 +471,11 @@ class ToastCard {
     // valid: compute the cross-origin origins the background must re-fetch
     // synchronously, and request BEFORE any await (an intervening await drops
     // the gesture token the prompt requires).
-    const origins = originsNeedingPermission(files, location.origin);
+    const origins = originsNeedingPermission(
+      files,
+      location.origin,
+      this.allowPrivateHosts,
+    );
     const grant =
       origins.length > 0
         ? browser.permissions.request({ origins })
@@ -852,6 +861,17 @@ function isSameOrigin(rawUrl: string): boolean {
     return new URL(rawUrl).origin === location.origin;
   } catch {
     return false;
+  }
+}
+
+// The host (with port, if any) shown as the file's source. Falls back to the raw
+// string if it somehow doesn't parse — messages are validated before they reach
+// here, so that's belt-and-suspenders.
+function hostForDisplay(rawUrl: string): string {
+  try {
+    return new URL(rawUrl).host;
+  } catch {
+    return rawUrl;
   }
 }
 

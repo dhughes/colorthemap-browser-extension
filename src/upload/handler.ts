@@ -1,7 +1,8 @@
 import { TokenExpired } from "../auth/errors";
 import { getAccessToken } from "../auth/service";
 import { base64ToBytes } from "../shared/base64";
-import { getFormatSpec } from "../shared/formats";
+import { isSafeRefetchTarget } from "../shared/refetch-safety";
+import { getAllowPrivateHosts } from "../shared/settings";
 import { matchesFormat } from "../shared/sniff";
 import { UploadNetworkError, UploadServerError } from "./errors";
 import { fetchMaps } from "./maps";
@@ -51,6 +52,7 @@ async function handleUploadBatch(
 ): Promise<UploadResult> {
   try {
     const accessToken = await getAccessToken();
+    const allowPrivate = await getAllowPrivateHosts();
 
     // Resolve every file's bytes (captured base64 or a credentialed re-fetch),
     // then sniff-validate each against its claimed format. Detector A already
@@ -59,7 +61,7 @@ async function handleUploadBatch(
     // locally is counted as failed and kept out of the CTM POST rather than
     // aborting the whole batch.
     const resolved = await Promise.all(
-      message.files.map((file) => resolveAndValidate(file)),
+      message.files.map((file) => resolveAndValidate(file, allowPrivate)),
     );
     const valid = resolved.filter(
       (r): r is { ok: true; file: ResolvedFile } => r.ok,
@@ -105,7 +107,27 @@ async function handleUploadBatch(
 
 async function resolveAndValidate(
   file: UploadFileInput,
+  allowPrivate: boolean,
 ): Promise<{ ok: true; file: ResolvedFile } | { ok: false; error: string }> {
+  // One generic failure line for every re-fetch/validation outcome. Keeping
+  // "host unreachable" indistinguishable from "responded but wasn't a GPS file"
+  // denies a malicious page an alive/dead oracle for the URLs it makes us fetch.
+  const failed = {
+    ok: false as const,
+    error: `${file.filename} couldn't be imported.`,
+  };
+
+  // The re-fetch target (cross-origin link, no captured bytes) is page-controlled
+  // and fetched with the user's cookies — refuse loopback/private/non-http(s)
+  // hosts before fetching (SSRF). The captured-bytes path never re-fetches.
+  if (
+    file.bytesBase64 === undefined &&
+    !isSafeRefetchTarget(file.url, { allowPrivate })
+  ) {
+    console.warn("[ctm] refusing unsafe re-fetch target", file.url);
+    return failed;
+  }
+
   // A per-file re-fetch failure (expired link, deleted resource, one flaky
   // request) is this file's problem, not the batch's — catch it so Promise.all
   // never rejects and the other files still upload.
@@ -117,14 +139,11 @@ async function resolveAndValidate(
         : await fetchFileBytes(file.url);
   } catch (error) {
     console.error("[ctm] could not read file", file.url, error);
-    return { ok: false, error: `${file.filename}: couldn't be read.` };
+    return failed;
   }
 
   if (!matchesFormat(new Uint8Array(bytes), file.format)) {
-    return {
-      ok: false,
-      error: `${file.filename}: doesn't look like a valid ${getFormatSpec(file.format).label} file.`,
-    };
+    return failed;
   }
   return { ok: true, file: { filename: file.filename, bytes } };
 }

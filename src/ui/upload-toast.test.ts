@@ -6,16 +6,15 @@ vi.mock("../upload/last-map", () => ({
   getLastMapForHost: vi.fn(async () => null),
   setLastMapForHost: vi.fn(async () => undefined),
 }));
-vi.mock("../shared/settings", () => ({
-  getAllowPrivateHosts: vi.fn(async () => false),
-}));
+// No `permissions` in the mock, deliberately: content scripts don't get that
+// API in any browser, so the toast must never touch it. A regression that
+// reintroduces browser.permissions.* here throws immediately.
 vi.mock("webextension-polyfill", () => ({
   default: {
     runtime: {
       sendMessage: vi.fn(),
       getURL: (path: string) => `chrome-extension://ext/${path}`,
     },
-    permissions: { request: vi.fn(async () => true) },
   },
 }));
 
@@ -27,7 +26,6 @@ import {
 } from "./upload-toast";
 
 const sendMessage = vi.mocked(browser.runtime.sendMessage);
-const permissionsRequest = vi.mocked(browser.permissions.request);
 
 const HOST = "ctm-upload-toast";
 
@@ -59,7 +57,6 @@ beforeEach(() => {
       return root;
     });
   sendMessage.mockReset();
-  permissionsRequest.mockReset().mockResolvedValue(true);
   currentUpload = undefined;
   mapsResult({ ok: true, maps: [{ id: 1, name: "Trails" }] });
 });
@@ -300,7 +297,7 @@ describe("send", () => {
     expect(link.textContent).toContain("Open your map");
   });
 
-  it("requests permission for only its own cross-origin host", async () => {
+  it("sends a cross-origin file straight through for the background to re-fetch", async () => {
     uploadResult({
       status: "done",
       uploaded: 1,
@@ -310,23 +307,25 @@ describe("send", () => {
       errors: [],
     });
     openUploadToast(
-      file({ url: "https://a.example/x.gpx", bytesBase64: undefined }),
-    );
-    await waitForPhase(newestCard(), "offer");
-    openUploadToast(
       file({ url: "https://b.example/y.gpx", bytesBase64: undefined }),
     );
-    await vi.waitFor(() => expect(cards()).toHaveLength(2));
     await waitForPhase(newestCard(), "offer");
 
-    // Each file is its own card, so sending one asks for just that host.
+    // Works with no permissions API present at all (see the polyfill mock):
+    // the bare URL rides to the background, which re-fetches and gates it.
     q(newestCard(), "button.bg-magenta-500").click();
     await waitForPhase(newestCard(), "success");
 
-    expect(permissionsRequest).toHaveBeenCalledTimes(1);
-    expect(permissionsRequest).toHaveBeenCalledWith({
-      origins: ["https://b.example/*"],
-    });
+    const upload = sendMessage.mock.calls
+      .map(([message]) => message as { type: string; files?: unknown[] })
+      .find((message) => message.type === "ctm:upload");
+    expect(upload?.files).toEqual([
+      {
+        url: "https://b.example/y.gpx",
+        filename: "route.gpx",
+        format: "gpx",
+      },
+    ]);
   });
 
   it("shows a friendly error when the upload fails", async () => {

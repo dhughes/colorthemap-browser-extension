@@ -26,10 +26,10 @@ export interface BatchOutcome {
   errors: string[];
 }
 
-// Fetches the file at `url` with the user's session cookies. The background SW
-// needs a host permission for the URL's origin (requested at the toast's Send
-// click); without it this fetch is blocked. Used for the Detector C link path,
-// where no intercepted body exists.
+// Fetches the file at `url` with the user's session cookies, relying on the
+// host access the content scripts' <all_urls> matches grant the extension.
+// Used for the Detector C link path, where no intercepted body exists. Callers
+// must pass the URL through isSafeRefetchTarget first.
 export async function fetchFileBytes(url: string): Promise<ArrayBuffer> {
   const response = await ctmFetch(url, { credentials: "include" });
   return response.arrayBuffer();

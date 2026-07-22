@@ -6,7 +6,6 @@ import {
 } from "../auth/messages";
 import { base64ToBytes } from "../shared/base64";
 import { getFormatSpec } from "../shared/formats";
-import { getAllowPrivateHosts } from "../shared/settings";
 import { matchesFormat } from "../shared/sniff";
 import { getLastMapForHost, setLastMapForHost } from "../upload/last-map";
 import {
@@ -25,7 +24,6 @@ import {
   describeUploadOutcome,
   isCountdownElapsed,
   offerTitle,
-  originsNeedingPermission,
   pauseCountdown,
   resolveInitialMapId,
   resumeCountdown,
@@ -248,10 +246,6 @@ class ToastCard {
   private files: DetectedFile[];
   private maps: CtmMap[] = [];
   private selectedMapId: number | null = null;
-  // Pre-loaded from storage during loadMaps so send() can read it synchronously
-  // (send() must run before its first await to keep the click-gesture token that
-  // browser.permissions.request requires).
-  private allowPrivateHosts = false;
   private phase: ToastPhase = "loading";
   private countdown: CountdownState | null = null;
   private raf: number | null = null;
@@ -350,7 +344,6 @@ class ToastCard {
       result.maps,
       await getLastMapForHost(this.hostname),
     );
-    this.allowPrivateHosts = await getAllowPrivateHosts();
     this.renderOffer();
   }
 
@@ -465,41 +458,15 @@ class ToastCard {
     if (this.phase !== "offer" || this.selectedMapId === null) {
       return;
     }
-    const mapId = this.selectedMapId;
-    const files = this.files;
-    // Front-load the host-permission prompt while the click gesture is still
-    // valid: compute the cross-origin origins the background must re-fetch
-    // synchronously, and request BEFORE any await (an intervening await drops
-    // the gesture token the prompt requires).
-    const origins = originsNeedingPermission(
-      files,
-      location.origin,
-      this.allowPrivateHosts,
-    );
-    const grant =
-      origins.length > 0
-        ? browser.permissions.request({ origins })
-        : Promise.resolve(true);
-    void this.runSend(mapId, files, grant);
+    // No host-permission request here: the content scripts' <all_urls> matches
+    // already give the background fetch access to any http(s) origin in every
+    // target browser, and the permissions API doesn't exist in content scripts
+    // anyway. The background's SSRF guard is the gate on re-fetch targets.
+    void this.runSend(this.selectedMapId, this.files);
   }
 
-  private async runSend(
-    mapId: number,
-    files: DetectedFile[],
-    grant: Promise<boolean>,
-  ): Promise<void> {
+  private async runSend(mapId: number, files: DetectedFile[]): Promise<void> {
     this.renderSending();
-
-    let granted = false;
-    try {
-      granted = await grant;
-    } catch (error) {
-      console.warn("[ctm] host permission request failed", error);
-    }
-    if (!granted) {
-      this.renderOutcome(translateFailureReason("permission-denied"), null);
-      return;
-    }
 
     const resolved = (
       await Promise.all(files.map((file) => this.resolveFile(file)))
@@ -649,10 +616,9 @@ class ToastCard {
     const pending = this.pendingSend;
     this.pendingSend = null;
     if (pending) {
-      // The user already picked a map and granted any host permission before
-      // the token was rejected — replay that send (permission still held, so
-      // pass a resolved grant rather than re-prompting outside a gesture).
-      await this.runSend(pending.mapId, pending.files, Promise.resolve(true));
+      // The user already picked a map before the token was rejected — replay
+      // that send verbatim.
+      await this.runSend(pending.mapId, pending.files);
     } else {
       // Never got as far as an offer — reload maps and land on the normal
       // offer for the user to pick a map and Send.

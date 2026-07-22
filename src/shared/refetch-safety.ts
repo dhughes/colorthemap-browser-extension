@@ -9,8 +9,12 @@
 // and canonicalizes IPv6 — so those tricks can't slip past a string check.
 //
 // Limitation: a hostname that *resolves* to an internal IP (DNS rebinding) isn't
-// caught here — we can't resolve DNS before fetching. The runtime host-permission
-// prompt remains the backstop for that case.
+// caught here — we can't resolve DNS before fetching. Nothing else in the
+// extension backstops that case: the content scripts' <all_urls> matches already
+// give the background fetch access to every http(s) origin, so this guard is the
+// only gate on re-fetch targets. (Firefox independently narrows the exposure:
+// its default MV3 CSP upgrades background http:// fetches to https, so a
+// plain-http internal service behind a rebinding name fails TLS there.)
 
 interface RefetchSafetyOptions {
   // When true (the buried "dangerous features" opt-in), private/loopback hosts

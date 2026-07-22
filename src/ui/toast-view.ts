@@ -1,6 +1,5 @@
 import { CTM_BASE_URL } from "../auth/config";
 import type { GpsFormat } from "../shared/formats";
-import { isSafeRefetchTarget } from "../shared/refetch-safety";
 import type {
   CtmMap,
   UploadFailureReason,
@@ -52,40 +51,6 @@ export function addDetectedFile(
     return { files: upgraded, added: false };
   }
   return { files, added: false };
-}
-
-// Distinct origins the background must be granted to re-fetch: files that are
-// cross-origin to the page (the content script can't read them) and carry no
-// captured bytes. Same-origin files are read by the content script itself, and
-// files with bytes need nothing. Internal/loopback/non-http(s) targets are
-// dropped — the background refuses them (SSRF guard), so there's no point
-// prompting for a host that can never be fetched. Origins are scheme+host only —
-// match patterns can't carry a port.
-export function originsNeedingPermission(
-  files: DetectedFile[],
-  pageOrigin: string,
-  allowPrivate: boolean,
-): string[] {
-  const origins = new Set<string>();
-  for (const file of files) {
-    if (file.bytesBase64 !== undefined) {
-      continue;
-    }
-    let url: URL;
-    try {
-      url = new URL(file.url);
-    } catch {
-      continue; // unparseable — nothing to request
-    }
-    if (url.origin === pageOrigin) {
-      continue; // same-origin: the content script reads it
-    }
-    if (!isSafeRefetchTarget(file.url, { allowPrivate })) {
-      continue; // background will refuse this target — don't prompt for it
-    }
-    origins.add(`${url.protocol}//${url.hostname}/*`);
-  }
-  return [...origins];
 }
 
 // ─── Countdown ───────────────────────────────────────────────────────────────
@@ -358,15 +323,6 @@ export function translateFailureReason(
         tone: "error",
         title: "Couldn't reach Color The Map",
         message: "Check your connection and give it another try.",
-        details: [],
-        showMapLink: false,
-      };
-    case "permission-denied":
-      return {
-        tone: "error",
-        title: "Permission needed",
-        message:
-          "Color The Map needs your OK to read that file. Try again to allow it.",
         details: [],
         showMapLink: false,
       };

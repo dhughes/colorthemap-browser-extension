@@ -7,7 +7,6 @@ import {
   describeUploadOutcome,
   isCountdownElapsed,
   offerTitle,
-  originsNeedingPermission,
   pauseCountdown,
   resetCountdown,
   resolveInitialMapId,
@@ -175,79 +174,6 @@ describe("countdown", () => {
   });
 });
 
-describe("originsNeedingPermission", () => {
-  const PAGE = "https://trailhub.example";
-
-  it("returns the distinct cross-origin hosts that lack bytes", () => {
-    const origins = originsNeedingPermission(
-      [
-        file({ url: "https://a.example/x.gpx" }),
-        file({ url: "https://a.example/y.gpx" }), // same host — deduped
-        file({ url: "https://b.example/z.gpx" }),
-      ],
-      PAGE,
-      false,
-    );
-    expect(origins).toEqual(["https://a.example/*", "https://b.example/*"]);
-  });
-
-  it("excludes same-origin files (the content script reads them)", () => {
-    expect(
-      originsNeedingPermission(
-        [file({ url: `${PAGE}/local.gpx` })],
-        PAGE,
-        false,
-      ),
-    ).toEqual([]);
-  });
-
-  it("excludes files that already carry bytes", () => {
-    expect(
-      originsNeedingPermission(
-        [file({ url: "https://a.example/x.gpx", bytesBase64: "PGdweC8+" })],
-        PAGE,
-        false,
-      ),
-    ).toEqual([]);
-  });
-
-  it("strips the port from the match pattern", () => {
-    expect(
-      originsNeedingPermission(
-        [file({ url: "https://cdn.example:8443/x.gpx" })],
-        PAGE,
-        false,
-      ),
-    ).toEqual(["https://cdn.example/*"]);
-  });
-
-  it("excludes an internal/loopback target when private hosts aren't allowed", () => {
-    expect(
-      originsNeedingPermission(
-        [file({ url: "http://127.0.0.1:8080/x.gpx" })],
-        PAGE,
-        false,
-      ),
-    ).toEqual([]);
-  });
-
-  it("includes an internal target when private hosts are allowed", () => {
-    expect(
-      originsNeedingPermission(
-        [file({ url: "http://127.0.0.1:8080/x.gpx" })],
-        PAGE,
-        true,
-      ),
-    ).toEqual(["http://127.0.0.1/*"]);
-  });
-
-  it("skips an unparseable URL", () => {
-    expect(
-      originsNeedingPermission([file({ url: "not a url" })], PAGE, false),
-    ).toEqual([]);
-  });
-});
-
 describe("offerTitle", () => {
   it("reads naturally for one file", () => {
     expect(offerTitle(1)).toBe("Found a GPS file");
@@ -407,13 +333,6 @@ describe("translateFailureReason", () => {
   it("names a connection problem on a network failure", () => {
     const card = translateFailureReason("network");
     expect(card.message.toLowerCase()).toContain("connection");
-  });
-
-  it("explains a declined permission", () => {
-    const card = translateFailureReason("permission-denied");
-    expect(`${card.title} ${card.message}`.toLowerCase()).toContain(
-      "permission",
-    );
   });
 
   it("stays generic and friendly on a server or unknown failure", () => {

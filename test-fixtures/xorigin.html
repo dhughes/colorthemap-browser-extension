@@ -92,36 +92,50 @@
         </li>
         <li><code>npm run build</code>, then load <code>dist/chrome</code> unpacked.</li>
         <li>Sign in to Color The Map (toolbar icon → Connect) with at least one map.</li>
-        <li><code>npm run fixtures</code> (serves this folder on port 8080).</li>
+        <li>
+          <code>npm run fixtures:https</code> (serves this folder over TLS on
+          port 8443; generates a cert via
+          <a href="https://github.com/FiloSottile/mkcert">mkcert</a> on first
+          run — <code>brew install mkcert nss</code> then
+          <code>mkcert -install</code> if you don't have it).
+          <span class="muted"
+            >Why https? Firefox's default MV3 extension CSP includes
+            <code>upgrade-insecure-requests</code>, which silently rewrites the
+            background's <code>http://</code> re-fetches to https — against a
+            plain-http fixture server they can only fail. Chrome doesn't
+            upgrade, but one https rig works everywhere.</span
+          >
+        </li>
         <li>
           Open this page at
-          <code>http://ctm-page.test:8080/xorigin.html</code>
-          (or <code>http://localhost:8080/xorigin.html</code>).
+          <code>https://ctm-page.test:8443/xorigin.html</code>.
         </li>
       </ol>
     </div>
 
     <section>
-      <h2>1. Cross-origin public host — expect a permission prompt</h2>
+      <h2>1. Cross-origin public-looking host — expect a direct import</h2>
       <p>
         These point at <code>valid.gpx</code> on a different hostname than the
-        page. The host isn't a private/loopback address, so the extension treats
-        it like any normal site and asks the browser for access before
-        re-fetching.
+        page, so the content script can't read the bytes itself — the
+        background re-fetches them. There is <strong>no permission
+        prompt</strong>: the extension's content scripts already run on all
+        sites, and that site access covers the background's cross-origin
+        fetches in every target browser. The SSRF guard (section 2) is what
+        stands between a page-controlled URL and your network.
       </p>
       <p class="expect">
         <strong>Expect:</strong> click → a new tab opens the file and the
         <em>Send to Color The Map</em> toast appears here → pick a map →
-        <strong>Send</strong> → the browser shows
-        <strong>“Allow this extension to access ctm-files.test?”</strong> →
-        <strong>Allow</strong> → the track imports (“You're on the map”). The
-        toast also shows <strong>“from ctm-files.test”</strong> as the source.
+        <strong>Send</strong> → the track imports (“You're on the map”), with
+        no browser prompt in between. The toast shows
+        <strong>“from ctm-files.test”</strong> as the source.
       </p>
       <ul>
         <li>
           <a
             class="trigger"
-            href="http://ctm-files.test:8080/files/valid.gpx"
+            href="https://ctm-files.test:8443/files/valid.gpx"
             target="_blank"
             rel="noopener"
             >valid.gpx from ctm-files.test</a
@@ -131,7 +145,7 @@
         <li>
           <a
             class="trigger"
-            href="http://files.lvh.me:8080/files/valid.gpx"
+            href="https://files.lvh.me:8443/files/valid.gpx"
             target="_blank"
             rel="noopener"
             >valid.gpx from files.lvh.me</a
@@ -150,8 +164,7 @@
       </p>
       <p class="expect">
         <strong>Expect:</strong> click → toast appears → <strong>Send</strong> →
-        <strong>no</strong> permission prompt, and a
-        <strong>“couldn't be imported”</strong> card. Confirm nothing was
+        a <strong>“couldn't be imported”</strong> card. Confirm nothing was
         fetched: <code>chrome://extensions</code> → this extension →
         <strong>service worker</strong> → DevTools → <strong>Network</strong> →
         there is <strong>no</strong> request to the address below. (The
@@ -162,7 +175,7 @@
         <li>
           <a
             class="trigger"
-            href="http://127.0.0.1:8080/files/valid.gpx"
+            href="https://127.0.0.1:8443/files/valid.gpx"
             target="_blank"
             rel="noopener"
             >valid.gpx from 127.0.0.1 (loopback)</a
@@ -199,9 +212,8 @@
       </p>
       <p class="expect">
         <strong>Expect:</strong> retry the <code>127.0.0.1</code> link from
-        section 2 → now <strong>Send</strong> prompts for
-        <code>127.0.0.1</code> and, on Allow, actually imports. Turn the toggle
-        back off when done.
+        section 2 → now <strong>Send</strong> actually imports the file. Turn
+        the toggle back off when done.
       </p>
     </section>
 
@@ -224,13 +236,8 @@
     <section>
       <h2>5. Cleanup</h2>
       <ul>
-        <li>Stop <code>npm run fixtures</code>.</li>
+        <li>Stop <code>npm run fixtures:https</code>.</li>
         <li>Remove the <code>ctm-page.test  ctm-files.test</code> line from <code>/etc/hosts</code>.</li>
-        <li>
-          Optionally revoke the granted host permission:
-          <code>chrome://extensions</code> → this extension → Details → Site
-          access.
-        </li>
       </ul>
     </section>
   </body>

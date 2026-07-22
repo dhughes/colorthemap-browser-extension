@@ -18,6 +18,8 @@
     "build:firefox": "TARGET_BROWSER=firefox vite build",
     "dev": "TARGET_BROWSER=chrome vite build --watch",
     "fixtures": "npx --yes http-server test-fixtures -p 8080 -c-1",
+    "prefixtures:https": "./scripts/setup-fixture-certs.sh",
+    "fixtures:https": "npx --yes http-server test-fixtures -p 8443 -S -C test-fixtures/.certs/cert.pem -K test-fixtures/.certs/key.pem -c-1",
     "package": "npm run build && npm run package:chrome && npm run package:edge && npm run package:firefox",
     "package:chrome": "web-ext build -s dist/chrome -a artifacts -n chrome.zip -o -i \"**/*.map\" \"**/.gitkeep\"",
     "package:edge": "web-ext build -s dist/edge -a artifacts -n edge.zip -o -i \"**/*.map\" \"**/.gitkeep\"",

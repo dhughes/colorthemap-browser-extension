@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CTM Importer — cross-origin re-fetch &amp; SSRF test</title>
+    <style>
+      body {
+        font: 15px/1.5 system-ui, sans-serif;
+        max-width: 52rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      section {
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        margin: 1rem 0;
+      }
+      h2 {
+        margin-top: 0;
+        font-size: 1.05rem;
+      }
+      code {
+        background: #f2f2f2;
+        padding: 0 4px;
+        border-radius: 3px;
+      }
+      pre {
+        background: #f2f2f2;
+        padding: 0.6rem 0.8rem;
+        border-radius: 6px;
+        overflow-x: auto;
+      }
+      ul {
+        margin: 0.5rem 0;
+        padding-left: 1.25rem;
+      }
+      li {
+        margin: 0.5rem 0;
+      }
+      a.trigger {
+        font-weight: 600;
+      }
+      .setup {
+        background: #eef4ff;
+        border: 1px solid #c5d6f5;
+        border-radius: 6px;
+        padding: 0.75rem 1rem;
+      }
+      .expect {
+        background: #eef9ee;
+        border: 1px solid #bfe3bf;
+        border-radius: 6px;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.9rem;
+        margin: 0.5rem 0 0.25rem;
+      }
+      .danger {
+        background: #fdeee9;
+        border: 1px solid #f0c0b0;
+      }
+      .muted {
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Cross-origin re-fetch — permission prompt &amp; SSRF deny</h1>
+    <p>
+      The main fixtures (<code>index.html</code>) serve every file
+      <strong>same-origin</strong>, so the content script reads the bytes itself
+      and the background never re-fetches. This page links to files on
+      <strong>other origins</strong>, which exercises the background's
+      credentialed re-fetch — the path guarded against SSRF in issue #23.
+    </p>
+
+    <div class="setup">
+      <strong>Setup</strong>
+      <ol>
+        <li>
+          Add two throwaway hostnames that resolve to your machine (removed in
+          the Cleanup step):
+          <pre># /etc/hosts  (sudo)
+127.0.0.1  ctm-page.test  ctm-files.test</pre>
+          <span class="muted"
+            >No-sudo alternative: skip this and use the
+            <code>files.lvh.me</code> link below — <code>*.lvh.me</code> already
+            resolves to 127.0.0.1 via public DNS (may be blocked on some
+            networks).</span
+          >
+        </li>
+        <li><code>npm run build</code>, then load <code>dist/chrome</code> unpacked.</li>
+        <li>Sign in to Color The Map (toolbar icon → Connect) with at least one map.</li>
+        <li><code>npm run fixtures</code> (serves this folder on port 8080).</li>
+        <li>
+          Open this page at
+          <code>http://ctm-page.test:8080/xorigin.html</code>
+          (or <code>http://localhost:8080/xorigin.html</code>).
+        </li>
+      </ol>
+    </div>
+
+    <section>
+      <h2>1. Cross-origin public host — expect a permission prompt</h2>
+      <p>
+        These point at <code>valid.gpx</code> on a different hostname than the
+        page. The host isn't a private/loopback address, so the extension treats
+        it like any normal site and asks the browser for access before
+        re-fetching.
+      </p>
+      <p class="expect">
+        <strong>Expect:</strong> click → a new tab opens the file and the
+        <em>Send to Color The Map</em> toast appears here → pick a map →
+        <strong>Send</strong> → the browser shows
+        <strong>“Allow this extension to access ctm-files.test?”</strong> →
+        <strong>Allow</strong> → the track imports (“You're on the map”). The
+        toast also shows <strong>“from ctm-files.test”</strong> as the source.
+      </p>
+      <ul>
+        <li>
+          <a
+            class="trigger"
+            href="http://ctm-files.test:8080/files/valid.gpx"
+            target="_blank"
+            rel="noopener"
+            >valid.gpx from ctm-files.test</a
+          >
+          <span class="muted">— needs the /etc/hosts line above.</span>
+        </li>
+        <li>
+          <a
+            class="trigger"
+            href="http://files.lvh.me:8080/files/valid.gpx"
+            target="_blank"
+            rel="noopener"
+            >valid.gpx from files.lvh.me</a
+          >
+          <span class="muted">— no /etc/hosts needed (public DNS → 127.0.0.1).</span>
+        </li>
+      </ul>
+    </section>
+
+    <section class="danger">
+      <h2>2. Internal / loopback targets — expect a block (no prompt, no fetch)</h2>
+      <p>
+        These point at loopback and private-network addresses — the kind of
+        target a malicious page would use to make the extension probe your own
+        machine or LAN. The SSRF guard refuses them before any request.
+      </p>
+      <p class="expect">
+        <strong>Expect:</strong> click → toast appears → <strong>Send</strong> →
+        <strong>no</strong> permission prompt, and a
+        <strong>“couldn't be imported”</strong> card. Confirm nothing was
+        fetched: <code>chrome://extensions</code> → this extension →
+        <strong>service worker</strong> → DevTools → <strong>Network</strong> →
+        there is <strong>no</strong> request to the address below. (The
+        <code>127.0.0.1</code> file really exists on the server, so the block is
+        genuine — not just a dead link.)
+      </p>
+      <ul>
+        <li>
+          <a
+            class="trigger"
+            href="http://127.0.0.1:8080/files/valid.gpx"
+            target="_blank"
+            rel="noopener"
+            >valid.gpx from 127.0.0.1 (loopback)</a
+          >
+        </li>
+        <li>
+          <a
+            class="trigger"
+            href="http://169.254.169.254/x.gpx"
+            target="_blank"
+            rel="noopener"
+            >169.254.169.254 (cloud metadata, link-local)</a
+          >
+        </li>
+        <li>
+          <a
+            class="trigger"
+            href="http://192.168.1.1/x.gpx"
+            target="_blank"
+            rel="noopener"
+            >192.168.1.1 (typical router, private)</a
+          >
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>3. Opt-in — “Dangerous features” toggle</h2>
+      <p>
+        Open the extension's <strong>Options</strong> page (right-click the
+        toolbar icon → Options, or <code>chrome://extensions</code> → Details →
+        Extension options) and enable
+        <strong>“Allow importing from private network addresses.”</strong>
+      </p>
+      <p class="expect">
+        <strong>Expect:</strong> retry the <code>127.0.0.1</code> link from
+        section 2 → now <strong>Send</strong> prompts for
+        <code>127.0.0.1</code> and, on Allow, actually imports. Turn the toggle
+        back off when done.
+      </p>
+    </section>
+
+    <section>
+      <h2>4. Extras worth a look</h2>
+      <ul>
+        <li>
+          <strong>Closed shadow root:</strong> with a toast open, run
+          <code>document.querySelector('ctm-upload-toast').shadowRoot</code> in
+          this page's console — it returns <code>null</code> (the page can't
+          read the toast).
+        </li>
+        <li>
+          <strong>Source host:</strong> every toast names where the file would
+          be fetched from (“from …”).
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>5. Cleanup</h2>
+      <ul>
+        <li>Stop <code>npm run fixtures</code>.</li>
+        <li>Remove the <code>ctm-page.test  ctm-files.test</code> line from <code>/etc/hosts</code>.</li>
+        <li>
+          Optionally revoke the granted host permission:
+          <code>chrome://extensions</code> → this extension → Details → Site
+          access.
+        </li>
+      </ul>
+    </section>
+  </body>
+</html>

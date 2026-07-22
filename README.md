@@ -108,6 +108,24 @@ After a code change: `npm run build`, then in `about:debugging` click **Reload**
 
 Deferred — see [issue #5](https://github.com/dhughes/colorthemap-browser-extension/issues/5). Safari needs Xcode, the `safari-web-extension-converter` tool, and (for distribution) Apple Developer enrollment, which together added more complexity than the scaffold milestone warranted. The architecture is Safari-friendly (single manifest source, no Safari-specific assumptions in src/), so adding it back should be additive when #5 is picked up.
 
+## Manual test fixtures
+
+Two static pages under `test-fixtures/` exercise a local build. Serve them with:
+
+```sh
+npm run fixtures   # http-server on http://localhost:8080
+```
+
+- **`index.html`** — same-origin detection/upload for all five formats. Open `http://localhost:8080/`.
+- **`xorigin.html`** — the **cross-origin re-fetch** path ([#23](https://github.com/dhughes/colorthemap-browser-extension/issues/23)): the runtime host-permission prompt, and the SSRF deny that refuses internal/loopback targets. A cross-origin file has to be linked from a _different_ origin than the page, so add two throwaway names that resolve to your machine:
+
+  ```sh
+  # /etc/hosts (sudo) — remove when done
+  127.0.0.1  ctm-page.test  ctm-files.test
+  ```
+
+  Then open `http://ctm-page.test:8080/xorigin.html` and follow the on-page steps. (An `files.lvh.me` link is included as a no-`/etc/hosts` alternative, but public DNS for `*.lvh.me` is blocked on some networks.)
+
 ## Authentication
 
 The extension authenticates against Color The Map using OAuth Authorization

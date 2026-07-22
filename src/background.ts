@@ -10,9 +10,9 @@ import {
   formatDetectionLog,
   type DetectionMessage,
 } from "./shared/messages";
-import { initDetectorB, type DownloadDetection } from "./detectors/detector-b";
+import { initDetectorB } from "./detectors/detector-b";
 import { handleUploadMessage } from "./upload/handler";
-import { openToastMessage } from "./upload/messages";
+import { deliverDownloadToast } from "./upload/toast-delivery";
 
 console.log(aliveMessage("background"));
 
@@ -69,22 +69,9 @@ function handleDetection(message: DetectionMessage): void {
 onDetection(handleDetection);
 
 // Detector B (the downloads API) runs in the background; the toast is
-// content-script UI, so ask the active tab to open it. The download itself
-// proceeds normally — we only also offer to send it to Color The Map.
-async function openDownloadToast(detection: DownloadDetection): Promise<void> {
-  try {
-    const [tab] = await browser.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
-    if (tab?.id != null) {
-      await browser.tabs.sendMessage(tab.id, openToastMessage(detection));
-    }
-  } catch {
-    // No active tab or no content script there — nothing to open.
-  }
-}
-
+// content-script UI, so ask the active tab to open it (with retries — see
+// toast-delivery.ts for the ephemeral-download-tab race this rides out). The
+// download itself proceeds normally — we only also offer to send it to CTM.
 initDetectorB((detection) => {
   handleDetection(
     createDetectionMessage({
@@ -94,7 +81,7 @@ initDetectorB((detection) => {
       url: detection.url,
     }),
   );
-  void openDownloadToast(detection);
+  void deliverDownloadToast(detection);
 });
 
 // onStartup only fires on browser launch; an evicted MV3 SW re-spun by any

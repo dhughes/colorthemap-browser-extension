@@ -229,6 +229,23 @@ function outcomeTally(result: {
   return parts.join(" · ");
 }
 
+// What the card was offering, so a success can name it. A bare count ("1
+// added") is indistinguishable between cards, which makes a lingering success
+// card look like whichever send you just made — the exact confusion that made a
+// working SSRF block look like a bypass during #23's manual pass.
+export interface OutcomeSource {
+  filename: string;
+  host: string;
+}
+
+// A lone file's identity beats a tally that only restates the title: "1 added"
+// under "You're on the map" says nothing the title didn't. Batches keep the
+// tally, where the per-bucket counts do carry information.
+function successMessage(sources: OutcomeSource[], tally: string): string {
+  const only = sources.length === 1 ? sources[0] : undefined;
+  return only ? `${only.filename} — from ${only.host}` : tally;
+}
+
 // Turns an upload outcome into the card the toast shows, mimicking CTM's upload
 // receipt: a disposition (clean / issues / failed), a tally of the buckets, and
 // per-file reasons under failures. An "error" result (transport/auth failure)
@@ -236,6 +253,7 @@ function outcomeTally(result: {
 export function describeUploadOutcome(
   result: UploadResult,
   mapName: string,
+  sources: OutcomeSource[] = [],
 ): OutcomeCard {
   if (result.status === "error") {
     return translateFailureReason(result.reason, result.detail);
@@ -260,7 +278,7 @@ export function describeUploadOutcome(
     return {
       tone: "success",
       title: result.uploaded > 0 ? "You're on the map" : "Already on your map",
-      message: tally,
+      message: successMessage(sources, tally),
       details: [],
       showMapLink: true,
     };

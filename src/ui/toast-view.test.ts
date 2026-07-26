@@ -238,6 +238,38 @@ describe("describeUploadOutcome", () => {
     expect(card.message).toBe("2 added");
   });
 
+  it("names the file and its source host on a single-file success", () => {
+    const card = describeUploadOutcome(
+      done({ uploaded: 1, total: 1 }),
+      "Trails",
+      [{ filename: "valid.gpx", host: "ctm-files.test:8443" }],
+    );
+    expect(card.tone).toBe("success");
+    expect(card.message).toBe("valid.gpx — from ctm-files.test:8443");
+  });
+
+  it("names the file on a single-file duplicate too", () => {
+    const card = describeUploadOutcome(
+      done({ duplicates: 1, total: 1 }),
+      "Trails",
+      [{ filename: "valid.gpx", host: "ctm-files.test:8443" }],
+    );
+    expect(card.title.toLowerCase()).toContain("already");
+    expect(card.message).toBe("valid.gpx — from ctm-files.test:8443");
+  });
+
+  it("keeps the tally for a batch, where the counts still carry information", () => {
+    const card = describeUploadOutcome(
+      done({ uploaded: 2, total: 2 }),
+      "Trails",
+      [
+        { filename: "a.gpx", host: "example.com" },
+        { filename: "b.gpx", host: "example.com" },
+      ],
+    );
+    expect(card.message).toBe("2 added");
+  });
+
   it("reports added and already-there in one tally", () => {
     const card = describeUploadOutcome(
       done({ uploaded: 1, duplicates: 2, total: 3 }),

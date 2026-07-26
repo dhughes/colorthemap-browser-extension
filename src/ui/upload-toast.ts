@@ -508,7 +508,14 @@ class ToastCard {
       };
     }
     this.renderOutcome(
-      describeUploadOutcome(result, this.mapName(mapId)),
+      describeUploadOutcome(
+        result,
+        this.mapName(mapId),
+        files.map((file) => ({
+          filename: file.filename,
+          host: hostForDisplay(file.url),
+        })),
+      ),
       mapId,
     );
   }

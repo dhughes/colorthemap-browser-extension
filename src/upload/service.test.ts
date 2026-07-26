@@ -226,4 +226,25 @@ describe("fetchFileBytes", () => {
       fetchFileBytes("https://example.com/route.gpx"),
     ).rejects.toThrow("nope");
   });
+
+  // The SSRF guard validates only the URL the page handed us, so following a
+  // redirect would let a public host bounce this credentialed fetch to an
+  // internal one. Verified against a real 302 in Chrome 148 before this was
+  // added: the loopback request fired and its body came back for upload.
+  it("refuses to follow redirects, which would escape the SSRF guard", async () => {
+    fetchMock.mockResolvedValue(new Response("<gpx></gpx>", { status: 200 }));
+
+    await fetchFileBytes("https://example.com/route.gpx");
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(init.redirect).toBe("error");
+  });
+
+  it("reports a redirecting host like any other unreachable file", async () => {
+    fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
+
+    await expect(
+      fetchFileBytes("https://example.com/route.gpx"),
+    ).rejects.toThrow(UploadNetworkError);
+  });
 });

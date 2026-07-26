@@ -30,8 +30,21 @@ export interface BatchOutcome {
 // host access the content scripts' <all_urls> matches grant the extension.
 // Used for the Detector C link path, where no intercepted body exists. Callers
 // must pass the URL through isSafeRefetchTarget first.
+//
+// `redirect: "error"` is load-bearing, not a nicety: isSafeRefetchTarget only
+// ever sees the URL the page supplied, so a public host that 302s to
+// http://127.0.0.1/ would walk the credentialed fetch straight past the guard
+// and hand the internal response back for upload. We can't validate the hops
+// instead — `redirect: "manual"` yields an opaqueredirect whose Location is
+// unreadable (verified in Chrome 148, extension host permissions and all), so
+// refusing to redirect at all is the only option that fails closed. Cost: a
+// file host that redirects (signed CDN URLs) can't be re-fetched, and reports
+// the same generic per-file failure as any other unreachable target.
 export async function fetchFileBytes(url: string): Promise<ArrayBuffer> {
-  const response = await ctmFetch(url, { credentials: "include" });
+  const response = await ctmFetch(url, {
+    credentials: "include",
+    redirect: "error",
+  });
   return response.arrayBuffer();
 }
 

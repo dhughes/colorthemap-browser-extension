@@ -110,6 +110,8 @@ Deferred — see [issue #5](https://github.com/dhughes/colorthemap-browser-exten
 
 ## Manual test fixtures
 
+**[`test-fixtures/TEST-PLAN.md`](test-fixtures/TEST-PLAN.md)** is the step-by-step manual pass — setup, both fixture pages, real-site verification, and the expected per-browser differences. Start there; the rest of this section is reference.
+
 Two static pages under `test-fixtures/` exercise a local build. Serve them with:
 
 ```sh

@@ -141,8 +141,21 @@ needed). Some corporate networks block `*.lvh.me` resolution; skip it if so.
 
 ### 3.2 Internal targets are refused before any request
 
+**Start from a clean slate**, and open the background console *before* you click
+— this section is easy to fool yourself on. Reload the fixture page so no cards
+from earlier sections survive (a card you've clicked into stops auto-dismissing
+and sits there indefinitely), and if you've been through §3.3, reload the
+options page and confirm the toggle really reads off.
+
+The **background console line is the assertion**, not the card. Success cards
+report only a count ("1 added") with no filename or host, so a leftover one from
+a legitimate §3.1/§3.3 send looks exactly like this section succeeding — and
+because CTM dedupes a repeated upload of the same `valid.gpx`, the track count
+in your map won't disambiguate it either.
+
 Each of these should produce a toast, and then **"couldn't be imported"** on
-Send:
+Send, with `[ctm] refusing unsafe re-fetch target <url>` in the background
+console:
 
 - `127.0.0.1` (loopback — **the file really exists there**, so a block proves the
   guard, not a dead link)
@@ -167,7 +180,9 @@ clicking it goes straight to options) — then *Dangerous features* → enable
 **"Allow importing from private network addresses."**
 
 - Retry the `127.0.0.1` link → now it **imports**.
-- Turn it back off and confirm the block returns.
+- Turn it back off, **reload the fixture page**, and confirm the block returns
+  (see the clean-slate warning in §3.2 — this is the exact ordering that makes a
+  stale success card look like a guard failure).
 
 ### 3.4 The page can't read the toast
 

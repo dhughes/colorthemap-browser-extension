@@ -50,7 +50,11 @@ export function isSafeRefetchTarget(
 }
 
 function isPrivateHost(hostname: string): boolean {
-  const host = hostname.toLowerCase();
+  // A trailing dot is the DNS root label: "localhost." resolves exactly like
+  // "localhost" but matches none of the name rules below, which made it a live
+  // bypass of every name-based check. WHATWG strips it from IPv4 literals but
+  // keeps it on names, so we have to.
+  const host = hostname.toLowerCase().replace(/\.+$/, "");
 
   if (
     host === "localhost" ||

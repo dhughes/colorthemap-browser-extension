@@ -37,6 +37,21 @@ describe("isSafeRefetchTarget (allowPrivate: false)", () => {
     expect(safe(url)).toBe(false);
   });
 
+  // The DNS root label. "localhost." resolves exactly like "localhost"
+  // (verified with a live server on a trailing-dot host), and WHATWG keeps the
+  // dot on names even though it strips it from IPv4 literals — so without
+  // normalization one character defeated every name rule above.
+  it.each([
+    "http://localhost./x.gpx",
+    "http://LOCALHOST./x.gpx",
+    "http://api.localhost./x.gpx",
+    "http://printer.local./x.gpx",
+    "http://box.home.arpa./x.gpx",
+    "http://svc.internal./x.gpx",
+  ])("rejects local hostname with a trailing dot %s", (url) => {
+    expect(safe(url)).toBe(false);
+  });
+
   it.each([
     "http://127.0.0.1/x.gpx",
     "http://127.0.0.2/x.gpx",
@@ -69,6 +84,16 @@ describe("isSafeRefetchTarget (allowPrivate: false)", () => {
     "http://0177.0.0.1/x.gpx", // octal-first-octet 127.0.0.1
     "http://0x7f.1/x.gpx", // mixed hex 127.0.0.1
   ])("rejects obfuscated loopback %s (normalizes then classifies)", (url) => {
+    expect(safe(url)).toBe(false);
+  });
+
+  // Userinfo is the oldest trick for making a URL read as a public host: the
+  // part before "@" is credentials, not the destination.
+  it.each([
+    "http://example.com@127.0.0.1/x.gpx",
+    "http://user:pass@192.168.1.1/x.gpx",
+    "http://komoot.com@localhost./x.gpx",
+  ])("classifies the host, not the userinfo, in %s", (url) => {
     expect(safe(url)).toBe(false);
   });
 

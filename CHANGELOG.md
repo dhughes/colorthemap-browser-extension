@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/dhughes/colorthemap-browser-extension/compare/v0.2.0...v0.3.0) (2026-07-27)
+
+
+### Features
+
+* deep link to imported tracks, and validate cross-origin re-fetch targets ([#40](https://github.com/dhughes/colorthemap-browser-extension/issues/40)) ([4663642](https://github.com/dhughes/colorthemap-browser-extension/commit/4663642e4ff8dc42e947ec5e7a196f1819bbf209))
+
 ## [0.2.0](https://github.com/dhughes/colorthemap-browser-extension/compare/v0.1.0...v0.2.0) (2026-07-19)
 
 

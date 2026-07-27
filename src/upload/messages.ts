@@ -66,7 +66,8 @@ export type ListMapsResult =
 // "done" means the batch was processed (CTM answered, or every file failed
 // local validation) — per-file outcomes live in the counts, with CTM's own
 // per-file error lines in `errors` (specific and actionable, kept verbatim).
-// "error" means a transport/auth failure stopped the whole batch.
+// `trackIds` is what the success card deep-links to. "error" means a
+// transport/auth failure stopped the whole batch.
 export type UploadResult =
   | {
       status: "done";
@@ -75,6 +76,7 @@ export type UploadResult =
       failed: number;
       total: number;
       errors: string[];
+      trackIds: number[];
     }
   | { status: "error"; reason: UploadFailureReason; detail?: string };
 

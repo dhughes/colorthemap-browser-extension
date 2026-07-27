@@ -157,10 +157,17 @@ export function sendButtonLabel(fileCount: number): string {
   return fileCount === 1 ? "Send" : `Send all ${fileCount}`;
 }
 
-// The map's page on Color The Map. Client-side only — no server round-trip. #29
-// will extend this to center on the uploaded track once CTM supports it.
-export function successDeepLink(mapId: number): string {
-  return `${CTM_BASE_URL}/maps/${mapId}`;
+// The map's page on Color The Map, landing with this send's tracks selected and
+// the camera framed on them. Client-side only — no server round-trip.
+//
+// Duplicate ids are worth passing, not filtering: CTM resolves each id to the
+// track that represents it, so a re-import frames the activity already on the
+// map instead of dropping the id (color-the-map#1043). Without that resolution
+// the link would silently degrade to a bare map link, which is what it falls
+// back to here when a send produced no tracks at all.
+export function successDeepLink(mapId: number, trackIds: number[]): string {
+  const map = `${CTM_BASE_URL}/maps/${mapId}`;
+  return trackIds.length > 0 ? `${map}?tracks=${trackIds.join(",")}` : map;
 }
 
 // ─── Sign-in prompt ──────────────────────────────────────────────────────────

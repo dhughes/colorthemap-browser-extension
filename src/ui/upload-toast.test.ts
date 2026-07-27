@@ -277,7 +277,33 @@ describe("interaction", () => {
 });
 
 describe("send", () => {
-  it("uploads and morphs into a success card with a map link", async () => {
+  it("uploads and morphs into a success card linking to the imported track", async () => {
+    uploadResult({
+      status: "done",
+      uploaded: 1,
+      duplicates: 0,
+      failed: 0,
+      total: 1,
+      errors: [],
+      trackIds: [7],
+    });
+    openUploadToast(file());
+    await waitForPhase(newestCard(), "offer");
+
+    q(newestCard(), "button.bg-magenta-500").click();
+    await waitForPhase(newestCard(), "success");
+
+    expect(newestCard().textContent).toContain("You're on the map");
+    const link = q<HTMLAnchorElement>(newestCard(), "a[href*='/maps/1']");
+    expect(link.href).toContain("?tracks=7");
+    expect(link.textContent).toContain("Open your map");
+  });
+
+  // The response crosses sendMessage, so it's untyped JSON at runtime. A
+  // background SW still on the previous version answers without the field —
+  // during an extension update that pairing is normal, not hypothetical — and
+  // the send must still land on a working card rather than throwing.
+  it("still shows a working map link when the response names no tracks", async () => {
     uploadResult({
       status: "done",
       uploaded: 1,
@@ -292,9 +318,8 @@ describe("send", () => {
     q(newestCard(), "button.bg-magenta-500").click();
     await waitForPhase(newestCard(), "success");
 
-    expect(newestCard().textContent).toContain("You're on the map");
     const link = q<HTMLAnchorElement>(newestCard(), "a[href*='/maps/1']");
-    expect(link.textContent).toContain("Open your map");
+    expect(link.href).not.toContain("tracks=");
   });
 
   it("sends a cross-origin file straight through for the background to re-fetch", async () => {

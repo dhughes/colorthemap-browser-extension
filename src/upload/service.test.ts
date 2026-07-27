@@ -66,6 +66,7 @@ describe("uploadTracks", () => {
       duplicates: 0,
       failed: 0,
       errors: [],
+      trackIds: [],
     });
   });
 
@@ -114,7 +115,70 @@ describe("uploadTracks", () => {
       duplicates: 0,
       failed: 1,
       errors: [reason],
+      trackIds: [],
     });
+  });
+
+  // The toast deep-links these, so they have to survive the per-file loop.
+  it("collects the track ids CTM returns across every request", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse(batch({ uploaded: 1, track_ids: [7] })),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(batch({ uploaded: 1, track_ids: [8] })),
+      );
+
+    const result = await uploadTracks({
+      accessToken: "t",
+      mapId: 1,
+      files: [
+        { filename: "ride.gpx", bytes: bytes("<gpx/>") },
+        { filename: "walk.gpx", bytes: bytes("<gpx/>") },
+      ],
+      baseUrl: BASE,
+    });
+
+    expect(result.trackIds).toEqual([7, 8]);
+  });
+
+  // CTM returns the existing row for an exact duplicate and resolves it to the
+  // canonical track on the deep link, so dropping it would lose the one id that
+  // makes an "Already on your map" card land somewhere useful.
+  it("keeps the track id of a duplicate, not just of a fresh import", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(batch({ duplicates: ["ride.gpx"], track_ids: [12] })),
+    );
+
+    const result = await uploadTracks({
+      accessToken: "t",
+      mapId: 1,
+      files: [{ filename: "ride.gpx", bytes: bytes("<gpx/>") }],
+      baseUrl: BASE,
+    });
+
+    expect(result.duplicates).toBe(1);
+    expect(result.trackIds).toEqual([12]);
+  });
+
+  it("keeps the ids of files that landed before the connection dropped", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse(batch({ uploaded: 1, track_ids: [7] })),
+      )
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    const result = await uploadTracks({
+      accessToken: "t",
+      mapId: 1,
+      files: [
+        { filename: "ride.gpx", bytes: bytes("<gpx/>") },
+        { filename: "walk.gpx", bytes: bytes("<gpx/>") },
+      ],
+      baseUrl: BASE,
+    });
+
+    expect(result.trackIds).toEqual([7]);
   });
 
   it("counts same-source and cross-source duplicates together", async () => {

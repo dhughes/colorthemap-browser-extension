@@ -195,8 +195,18 @@ describe("sendButtonLabel", () => {
 });
 
 describe("successDeepLink", () => {
-  it("links to the map's page", () => {
-    expect(successDeepLink(42)).toMatch(/\/maps\/42$/);
+  it("frames the map on the tracks the send produced", () => {
+    expect(successDeepLink(42, [7, 8])).toMatch(/\/maps\/42\?tracks=7,8$/);
+  });
+
+  it("passes duplicate ids through — CTM resolves them to the canonical track", () => {
+    expect(successDeepLink(42, [12])).toMatch(/\?tracks=12$/);
+  });
+
+  // Nothing landed (or CTM named no tracks): a bare map link still beats a
+  // link that says "frame nothing", which lands with an empty selection.
+  it("falls back to the plain map page when there are no tracks", () => {
+    expect(successDeepLink(42, [])).toMatch(/\/maps\/42$/);
   });
 });
 
@@ -225,6 +235,7 @@ describe("describeUploadOutcome", () => {
     failed: 0,
     total: 0,
     errors: [],
+    trackIds: [],
     ...over,
   });
 

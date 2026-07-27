@@ -19,11 +19,17 @@ interface TrackUploadResponse {
 // What a whole send produced, trimmed to the counts + verbatim per-file error
 // lines the toast needs. Auth/network failures never reach here — they throw
 // out and are classified in the handler.
+//
+// `trackIds` carries every track CTM associated with this send, duplicates
+// included: CTM returns the existing row's id for an exact duplicate and the
+// new row's for a cross-source one, and resolves either to the track that
+// represents it when the toast deep-links them (color-the-map#1043).
 export interface BatchOutcome {
   uploaded: number;
   duplicates: number;
   failed: number;
   errors: string[];
+  trackIds: number[];
 }
 
 // Fetches the file at `url` with the user's session cookies, relying on the
@@ -66,6 +72,7 @@ export async function uploadTracks(params: {
     duplicates: 0,
     failed: 0,
     errors: [],
+    trackIds: [],
   };
 
   for (let i = 0; i < params.files.length; i++) {
@@ -111,6 +118,7 @@ export async function uploadTracks(params: {
       body.duplicates.length + body.cross_source_duplicates.length;
     outcome.failed += body.failed;
     outcome.errors.push(...body.errors);
+    outcome.trackIds.push(...body.track_ids);
   }
 
   return outcome;

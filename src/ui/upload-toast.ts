@@ -324,7 +324,7 @@ class ToastCard {
       )) as ListMapsResult;
     } catch (error) {
       console.error("[ctm] list maps failed", error);
-      this.renderOutcome(translateFailureReason("unknown"), null);
+      this.renderOutcome(translateFailureReason("unknown"), null, []);
       return;
     }
     if (!result.ok) {
@@ -332,7 +332,7 @@ class ToastCard {
         this.renderSignIn();
         return;
       }
-      this.renderOutcome(translateFailureReason(result.reason), null);
+      this.renderOutcome(translateFailureReason(result.reason), null, []);
       return;
     }
     if (result.maps.length === 0) {
@@ -474,7 +474,7 @@ class ToastCard {
     if (resolved.length === 0) {
       // The grant succeeded (or wasn't needed) but no file could be read — a
       // same-origin read failure, not a declined permission.
-      this.renderOutcome(translateFailureReason("network"), null);
+      this.renderOutcome(translateFailureReason("network"), null, []);
       return;
     }
     // Files dropped by a local read failure never reach CTM's counts; fold them
@@ -490,7 +490,7 @@ class ToastCard {
       )) as UploadResult;
     } catch (error) {
       console.error("[ctm] upload request failed", error);
-      this.renderOutcome(translateFailureReason("unknown"), null);
+      this.renderOutcome(translateFailureReason("unknown"), null, []);
       return;
     }
     if (result.status === "error" && result.reason === "sign-in-required") {
@@ -517,6 +517,11 @@ class ToastCard {
         })),
       ),
       mapId,
+      // Defaulted despite the type: this crossed sendMessage, so it's JSON from
+      // another realm, not a value the compiler vouched for. A background SW
+      // still on the previous version answers without the field, and an
+      // undefined here would throw out of a send that otherwise succeeded.
+      (result.status === "done" ? result.trackIds : undefined) ?? [],
     );
   }
 
@@ -640,7 +645,11 @@ class ToastCard {
     this.hideBar();
   }
 
-  private renderOutcome(card: OutcomeCard, mapId: number | null): void {
+  private renderOutcome(
+    card: OutcomeCard,
+    mapId: number | null,
+    trackIds: number[],
+  ): void {
     this.setPhase(card.tone === "error" ? "error" : "success");
     this.title.textContent = card.title;
 
@@ -678,7 +687,7 @@ class ToastCard {
     // Connect card instead, see renderSignIn.)
     const primary =
       card.showMapLink && mapId !== null
-        ? { href: successDeepLink(mapId), label: "Open your map" }
+        ? { href: successDeepLink(mapId, trackIds), label: "Open your map" }
         : null;
 
     if (primary) {

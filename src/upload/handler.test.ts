@@ -104,6 +104,7 @@ describe("upload (batch)", () => {
       duplicates: 0,
       failed: 0,
       errors: [],
+      trackIds: [7, 8],
     });
 
     const result = await handleUploadMessage(
@@ -131,6 +132,7 @@ describe("upload (batch)", () => {
       failed: 0,
       total: 2,
       errors: [],
+      trackIds: [7, 8],
     });
   });
 
@@ -143,6 +145,7 @@ describe("upload (batch)", () => {
       duplicates: 0,
       failed: 0,
       errors: [],
+      trackIds: [],
     });
 
     await handleUploadMessage(
@@ -166,6 +169,7 @@ describe("upload (batch)", () => {
       duplicates: 0,
       failed: 0,
       errors: [],
+      trackIds: [],
     });
 
     const result = await handleUploadMessage(
@@ -200,6 +204,7 @@ describe("upload (batch)", () => {
       duplicates: 0,
       failed: 0,
       errors: [],
+      trackIds: [],
     });
 
     const result = await handleUploadMessage(
@@ -325,6 +330,7 @@ describe("upload (batch)", () => {
         duplicates: 0,
         failed: 0,
         errors: [],
+        trackIds: [],
       });
 
       await handleUploadMessage(
@@ -348,6 +354,7 @@ describe("upload (batch)", () => {
         duplicates: 0,
         failed: 0,
         errors: [],
+        trackIds: [],
       });
 
       await handleUploadMessage(

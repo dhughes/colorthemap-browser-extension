@@ -78,6 +78,7 @@ async function handleUploadBatch(
         failed: localErrors.length,
         total: message.files.length,
         errors: localErrors,
+        trackIds: [],
       };
     }
 
@@ -94,6 +95,7 @@ async function handleUploadBatch(
       failed: outcome.failed + localErrors.length,
       total: message.files.length,
       errors: [...outcome.errors, ...localErrors],
+      trackIds: outcome.trackIds,
     };
   } catch (error) {
     console.error("[ctm] upload failed", error);

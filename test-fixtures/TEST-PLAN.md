@@ -195,6 +195,26 @@ document.querySelector('ctm-upload-toast').shadowRoot
 Expect `null` — the shadow root is closed, so a hostile page can't read what the
 toast is showing or which files were detected.
 
+### 3.5 The success card deep-links to the track it just imported
+
+After any successful send, the card's **Open your map** button should carry the
+tracks it produced, not just the map:
+
+- Hover it (or copy the link) — the href ends `…/maps/{id}?tracks={trackId}`.
+- Click it → CTM lands with that track **selected and the camera framed on it**,
+  and strips `?tracks=` from the URL on arrival.
+
+Then **send the same file a second time**. The card reads *"Already on your
+map"*, and this is the case worth checking closely: CTM returns the *existing*
+track's id for a duplicate, so the link must still land on that track. It relies
+on CTM resolving an id to whichever row represents it (color-the-map#1043) —
+before that landed, a duplicate's id was dropped silently and you'd arrive with
+nothing selected, indistinguishable from a plain map link.
+
+A bare `/maps/{id}` with no `?tracks=` is the correct fallback when a send
+produced no tracks at all. It's a **finding** if you see it after a send that
+reported files added or already-there.
+
 ---
 
 ## Part 4 — Real sites

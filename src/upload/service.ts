@@ -19,19 +19,38 @@ interface TrackUploadResponse {
 // What a whole send produced, trimmed to the counts + verbatim per-file error
 // lines the toast needs. Auth/network failures never reach here — they throw
 // out and are classified in the handler.
+//
+// `trackIds` carries every track CTM associated with this send, duplicates
+// included: CTM returns the existing row's id for an exact duplicate and the
+// new row's for a cross-source one, and resolves either to the track that
+// represents it when the toast deep-links them (color-the-map#1043).
 export interface BatchOutcome {
   uploaded: number;
   duplicates: number;
   failed: number;
   errors: string[];
+  trackIds: number[];
 }
 
-// Fetches the file at `url` with the user's session cookies. The background SW
-// needs a host permission for the URL's origin (requested at the toast's Send
-// click); without it this fetch is blocked. Used for the Detector C link path,
-// where no intercepted body exists.
+// Fetches the file at `url` with the user's session cookies, relying on the
+// host access the content scripts' <all_urls> matches grant the extension.
+// Used for the Detector C link path, where no intercepted body exists. Callers
+// must pass the URL through isSafeRefetchTarget first.
+//
+// `redirect: "error"` is load-bearing, not a nicety: isSafeRefetchTarget only
+// ever sees the URL the page supplied, so a public host that 302s to
+// http://127.0.0.1/ would walk the credentialed fetch straight past the guard
+// and hand the internal response back for upload. We can't validate the hops
+// instead — `redirect: "manual"` yields an opaqueredirect whose Location is
+// unreadable (verified in Chrome 148, extension host permissions and all), so
+// refusing to redirect at all is the only option that fails closed. Cost: a
+// file host that redirects (signed CDN URLs) can't be re-fetched, and reports
+// the same generic per-file failure as any other unreachable target.
 export async function fetchFileBytes(url: string): Promise<ArrayBuffer> {
-  const response = await ctmFetch(url, { credentials: "include" });
+  const response = await ctmFetch(url, {
+    credentials: "include",
+    redirect: "error",
+  });
   return response.arrayBuffer();
 }
 
@@ -53,6 +72,7 @@ export async function uploadTracks(params: {
     duplicates: 0,
     failed: 0,
     errors: [],
+    trackIds: [],
   };
 
   for (let i = 0; i < params.files.length; i++) {
@@ -98,6 +118,7 @@ export async function uploadTracks(params: {
       body.duplicates.length + body.cross_source_duplicates.length;
     outcome.failed += body.failed;
     outcome.errors.push(...body.errors);
+    outcome.trackIds.push(...body.track_ids);
   }
 
   return outcome;

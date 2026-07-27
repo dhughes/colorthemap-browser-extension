@@ -66,6 +66,7 @@ describe("uploadTracks", () => {
       duplicates: 0,
       failed: 0,
       errors: [],
+      trackIds: [],
     });
   });
 
@@ -114,7 +115,70 @@ describe("uploadTracks", () => {
       duplicates: 0,
       failed: 1,
       errors: [reason],
+      trackIds: [],
     });
+  });
+
+  // The toast deep-links these, so they have to survive the per-file loop.
+  it("collects the track ids CTM returns across every request", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse(batch({ uploaded: 1, track_ids: [7] })),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(batch({ uploaded: 1, track_ids: [8] })),
+      );
+
+    const result = await uploadTracks({
+      accessToken: "t",
+      mapId: 1,
+      files: [
+        { filename: "ride.gpx", bytes: bytes("<gpx/>") },
+        { filename: "walk.gpx", bytes: bytes("<gpx/>") },
+      ],
+      baseUrl: BASE,
+    });
+
+    expect(result.trackIds).toEqual([7, 8]);
+  });
+
+  // CTM returns the existing row for an exact duplicate and resolves it to the
+  // canonical track on the deep link, so dropping it would lose the one id that
+  // makes an "Already on your map" card land somewhere useful.
+  it("keeps the track id of a duplicate, not just of a fresh import", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(batch({ duplicates: ["ride.gpx"], track_ids: [12] })),
+    );
+
+    const result = await uploadTracks({
+      accessToken: "t",
+      mapId: 1,
+      files: [{ filename: "ride.gpx", bytes: bytes("<gpx/>") }],
+      baseUrl: BASE,
+    });
+
+    expect(result.duplicates).toBe(1);
+    expect(result.trackIds).toEqual([12]);
+  });
+
+  it("keeps the ids of files that landed before the connection dropped", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse(batch({ uploaded: 1, track_ids: [7] })),
+      )
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    const result = await uploadTracks({
+      accessToken: "t",
+      mapId: 1,
+      files: [
+        { filename: "ride.gpx", bytes: bytes("<gpx/>") },
+        { filename: "walk.gpx", bytes: bytes("<gpx/>") },
+      ],
+      baseUrl: BASE,
+    });
+
+    expect(result.trackIds).toEqual([7]);
   });
 
   it("counts same-source and cross-source duplicates together", async () => {
@@ -225,5 +289,26 @@ describe("fetchFileBytes", () => {
     await expect(
       fetchFileBytes("https://example.com/route.gpx"),
     ).rejects.toThrow("nope");
+  });
+
+  // The SSRF guard validates only the URL the page handed us, so following a
+  // redirect would let a public host bounce this credentialed fetch to an
+  // internal one. Verified against a real 302 in Chrome 148 before this was
+  // added: the loopback request fired and its body came back for upload.
+  it("refuses to follow redirects, which would escape the SSRF guard", async () => {
+    fetchMock.mockResolvedValue(new Response("<gpx></gpx>", { status: 200 }));
+
+    await fetchFileBytes("https://example.com/route.gpx");
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(init.redirect).toBe("error");
+  });
+
+  it("reports a redirecting host like any other unreachable file", async () => {
+    fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
+
+    await expect(
+      fetchFileBytes("https://example.com/route.gpx"),
+    ).rejects.toThrow(UploadNetworkError);
   });
 });

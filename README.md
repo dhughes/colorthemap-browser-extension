@@ -108,6 +108,29 @@ After a code change: `npm run build`, then in `about:debugging` click **Reload**
 
 Deferred — see [issue #5](https://github.com/dhughes/colorthemap-browser-extension/issues/5). Safari needs Xcode, the `safari-web-extension-converter` tool, and (for distribution) Apple Developer enrollment, which together added more complexity than the scaffold milestone warranted. The architecture is Safari-friendly (single manifest source, no Safari-specific assumptions in src/), so adding it back should be additive when #5 is picked up.
 
+## Manual test fixtures
+
+**[`test-fixtures/TEST-PLAN.md`](test-fixtures/TEST-PLAN.md)** is the step-by-step manual pass — setup, both fixture pages, real-site verification, and the expected per-browser differences. Start there; the rest of this section is reference.
+
+Two static pages under `test-fixtures/` exercise a local build. Serve them with:
+
+```sh
+npm run fixtures         # http-server on http://localhost:8080
+npm run fixtures:https   # TLS on https://localhost:8443 (needed for xorigin.html)
+```
+
+- **`index.html`** — same-origin detection/upload for all five formats. Open `http://localhost:8080/`.
+- **`xorigin.html`** — the **cross-origin re-fetch** path ([#23](https://github.com/dhughes/colorthemap-browser-extension/issues/23)): the background's credentialed re-fetch of a file linked from another origin, and the SSRF deny that refuses internal/loopback targets before any request. A cross-origin file has to be linked from a _different_ origin than the page, so add two throwaway names that resolve to your machine:
+
+  ```sh
+  # /etc/hosts (sudo) — remove when done
+  127.0.0.1  ctm-page.test  ctm-files.test
+  ```
+
+  Then open `https://ctm-page.test:8443/xorigin.html` and follow the on-page steps. (A `files.lvh.me` link is included as a no-`/etc/hosts` alternative, but public DNS for `*.lvh.me` is blocked on some networks.)
+
+  This fixture must be served over **https** (`fixtures:https` generates a local cert via [mkcert](https://github.com/FiloSottile/mkcert) — `brew install mkcert nss`, then `mkcert -install` once): Firefox's default MV3 extension CSP includes `upgrade-insecure-requests`, which rewrites the background's `http://` re-fetches to https, so a plain-http fixture host can never answer them. There is deliberately **no runtime host-permission prompt** in this flow — the content scripts' `<all_urls>` matches already grant the background fetch access to any http(s) origin in Chrome, Edge, and Firefox alike (verified empirically), and the permissions API isn't even available where the toast lives. The SSRF guard in `src/shared/refetch-safety.ts` is the gate on re-fetch targets.
+
 ## Authentication
 
 The extension authenticates against Color The Map using OAuth Authorization

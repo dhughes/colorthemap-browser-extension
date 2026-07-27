@@ -1,3 +1,4 @@
+import { getAllowPrivateHosts, setAllowPrivateHosts } from "./shared/settings";
 import {
   CTM_SIGNUP_URL,
   connectAuthPanel,
@@ -15,16 +16,30 @@ const signup = document.getElementById("signup") as HTMLAnchorElement;
 const authError = document.getElementById("auth-error")!;
 const connect = document.getElementById("connect")!;
 const disconnect = document.getElementById("disconnect")!;
+const dangerWarning = document.getElementById("danger-warning")!;
+const allowPrivateHosts = document.getElementById(
+  "allow-private-hosts",
+) as HTMLInputElement;
 
 signup.href = CTM_SIGNUP_URL;
 
 // Recipe-styled controls get their classes here, not in the markup, so
 // recipes.ts stays the single source of the shared looks.
 authError.className = `${alertClass("error")} mb-6`;
+dangerWarning.className = `${alertClass("warning")} mb-4`;
 connect.className = buttonClass({ tone: "primary", size: "lg", width: "full" });
 disconnect.className = buttonClass({
   tone: "destructive",
   emphasis: "secondary",
+});
+
+// The "allow private hosts" opt-in is independent of auth — it gates the
+// re-fetch SSRF guard (see refetch-safety.ts), so it's always shown and wired.
+void getAllowPrivateHosts().then((on) => {
+  allowPrivateHosts.checked = on;
+});
+allowPrivateHosts.addEventListener("change", () => {
+  void setAllowPrivateHosts(allowPrivateHosts.checked);
 });
 
 function showError(message: string): void {

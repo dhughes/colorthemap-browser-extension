@@ -24,9 +24,7 @@ import {
   describeUploadOutcome,
   isCountdownElapsed,
   offerTitle,
-  originsNeedingPermission,
   pauseCountdown,
-  resetCountdown,
   resolveInitialMapId,
   resumeCountdown,
   sendButtonLabel,
@@ -160,7 +158,11 @@ class UploadToastHost {
     // cards (pointer-events:auto) are interactive, so the page stays usable.
     this.host.style.cssText =
       "position: fixed !important; inset: 0 !important; z-index: 2147483647 !important; pointer-events: none !important;";
-    this.shadow = this.host.attachShadow({ mode: "open" });
+    // Closed so a host page can't read the toast's contents via
+    // host.shadowRoot — that readback was a recon oracle (SSRF hardening, #23).
+    // The controller keeps its own `this.shadow` handle, so nothing internal
+    // depends on the element exposing shadowRoot.
+    this.shadow = this.host.attachShadow({ mode: "closed" });
 
     const style = document.createElement("style");
     style.textContent = shadowCss;
@@ -188,22 +190,19 @@ class UploadToastHost {
   };
 
   private addFile(file: DetectedFile): void {
-    if (this.isOfferedAnywhere(file.url)) {
+    // One card per distinct file. If the same URL already has a card, only act
+    // when this arrival carries bytes the card lacked (Detector C queued the
+    // bare link, then Detector A caught the body) — upgrade it in place so Send
+    // needn't re-fetch. Otherwise it's a duplicate and we ignore it.
+    const existing = this.cards.find((card) => card.hasUrl(file.url));
+    if (existing) {
+      existing.upgradeBytes(file);
       return;
     }
-    const newest = this.cards[this.cards.length - 1];
-    if (newest?.canAccumulate()) {
-      newest.appendFile(file);
-    } else {
-      const card = new ToastCard(file, this.stack, () => this.dispose(card));
-      this.cards.push(card);
-      card.mount();
-    }
+    const card = new ToastCard(file, this.stack, () => this.dispose(card));
+    this.cards.push(card);
+    card.mount();
     this.syncOfferedUrls();
-  }
-
-  private isOfferedAnywhere(url: string): boolean {
-    return this.cards.some((card) => card.hasUrl(url));
   }
 
   private dispose(card: ToastCard): void {
@@ -294,10 +293,6 @@ class ToastCard {
     void this.loadMaps();
   }
 
-  canAccumulate(): boolean {
-    return this.phase === "offer";
-  }
-
   hasUrl(url: string): boolean {
     return this.files.some((file) => file.url === url);
   }
@@ -306,18 +301,12 @@ class ToastCard {
     return this.files.map((file) => file.url);
   }
 
-  appendFile(file: DetectedFile): void {
-    const { files, added } = addDetectedFile(this.files, file);
+  // The same URL arrived again; adopt bytes it now carries (Detector A caught the
+  // body after Detector C queued the bare link) so Send won't re-fetch. Nothing
+  // visible changes — same filename, host, format — so there's no re-render.
+  upgradeBytes(file: DetectedFile): void {
+    const { files } = addDetectedFile(this.files, file);
     this.files = files;
-    if (!added) {
-      return;
-    }
-    // Preserve status: a file arriving after the user paused (hover) or engaged
-    // (focus) must not restart the timer under them.
-    if (this.countdown !== null) {
-      this.countdown = resetCountdown(this.countdown, now());
-    }
-    this.renderOffer();
   }
 
   private readonly onKeydown = (event: KeyboardEvent): void => {
@@ -335,7 +324,7 @@ class ToastCard {
       )) as ListMapsResult;
     } catch (error) {
       console.error("[ctm] list maps failed", error);
-      this.renderOutcome(translateFailureReason("unknown"), null);
+      this.renderOutcome(translateFailureReason("unknown"), null, []);
       return;
     }
     if (!result.ok) {
@@ -343,7 +332,7 @@ class ToastCard {
         this.renderSignIn();
         return;
       }
-      this.renderOutcome(translateFailureReason(result.reason), null);
+      this.renderOutcome(translateFailureReason(result.reason), null, []);
       return;
     }
     if (result.maps.length === 0) {
@@ -412,7 +401,8 @@ class ToastCard {
   private fileList(): HTMLElement {
     const list = el("ul", "flex flex-col gap-2");
     for (const file of this.files) {
-      const row = el("li", "flex items-center gap-2");
+      const row = el("li", "flex flex-col gap-0.5");
+      const top = el("div", "flex items-center gap-2");
       const name = el(
         "span",
         "min-w-0 flex-1 truncate text-secondary text-text",
@@ -421,7 +411,15 @@ class ToastCard {
       name.title = file.filename;
       const badge = el("span", formatBadgeClass);
       badge.textContent = getFormatSpec(file.format).label;
-      row.append(name, badge);
+      top.append(name, badge);
+
+      // Name the source host so it's obvious where a file would be fetched
+      // from — the URL isn't otherwise visible, and a link can point anywhere.
+      const source = el("span", "truncate text-secondary text-text-muted");
+      source.textContent = `from ${hostForDisplay(file.url)}`;
+      source.title = file.url;
+
+      row.append(top, source);
       list.append(row);
     }
     return list;
@@ -460,37 +458,15 @@ class ToastCard {
     if (this.phase !== "offer" || this.selectedMapId === null) {
       return;
     }
-    const mapId = this.selectedMapId;
-    const files = this.files;
-    // Front-load the host-permission prompt while the click gesture is still
-    // valid: compute the cross-origin origins the background must re-fetch
-    // synchronously, and request BEFORE any await (an intervening await drops
-    // the gesture token the prompt requires).
-    const origins = originsNeedingPermission(files, location.origin);
-    const grant =
-      origins.length > 0
-        ? browser.permissions.request({ origins })
-        : Promise.resolve(true);
-    void this.runSend(mapId, files, grant);
+    // No host-permission request here: the content scripts' <all_urls> matches
+    // already give the background fetch access to any http(s) origin in every
+    // target browser, and the permissions API doesn't exist in content scripts
+    // anyway. The background's SSRF guard is the gate on re-fetch targets.
+    void this.runSend(this.selectedMapId, this.files);
   }
 
-  private async runSend(
-    mapId: number,
-    files: DetectedFile[],
-    grant: Promise<boolean>,
-  ): Promise<void> {
+  private async runSend(mapId: number, files: DetectedFile[]): Promise<void> {
     this.renderSending();
-
-    let granted = false;
-    try {
-      granted = await grant;
-    } catch (error) {
-      console.warn("[ctm] host permission request failed", error);
-    }
-    if (!granted) {
-      this.renderOutcome(translateFailureReason("permission-denied"), null);
-      return;
-    }
 
     const resolved = (
       await Promise.all(files.map((file) => this.resolveFile(file)))
@@ -498,7 +474,7 @@ class ToastCard {
     if (resolved.length === 0) {
       // The grant succeeded (or wasn't needed) but no file could be read — a
       // same-origin read failure, not a declined permission.
-      this.renderOutcome(translateFailureReason("network"), null);
+      this.renderOutcome(translateFailureReason("network"), null, []);
       return;
     }
     // Files dropped by a local read failure never reach CTM's counts; fold them
@@ -514,7 +490,7 @@ class ToastCard {
       )) as UploadResult;
     } catch (error) {
       console.error("[ctm] upload request failed", error);
-      this.renderOutcome(translateFailureReason("unknown"), null);
+      this.renderOutcome(translateFailureReason("unknown"), null, []);
       return;
     }
     if (result.status === "error" && result.reason === "sign-in-required") {
@@ -532,8 +508,20 @@ class ToastCard {
       };
     }
     this.renderOutcome(
-      describeUploadOutcome(result, this.mapName(mapId)),
+      describeUploadOutcome(
+        result,
+        this.mapName(mapId),
+        files.map((file) => ({
+          filename: file.filename,
+          host: hostForDisplay(file.url),
+        })),
+      ),
       mapId,
+      // Defaulted despite the type: this crossed sendMessage, so it's JSON from
+      // another realm, not a value the compiler vouched for. A background SW
+      // still on the previous version answers without the field, and an
+      // undefined here would throw out of a send that otherwise succeeded.
+      (result.status === "done" ? result.trackIds : undefined) ?? [],
     );
   }
 
@@ -640,10 +628,9 @@ class ToastCard {
     const pending = this.pendingSend;
     this.pendingSend = null;
     if (pending) {
-      // The user already picked a map and granted any host permission before
-      // the token was rejected — replay that send (permission still held, so
-      // pass a resolved grant rather than re-prompting outside a gesture).
-      await this.runSend(pending.mapId, pending.files, Promise.resolve(true));
+      // The user already picked a map before the token was rejected — replay
+      // that send verbatim.
+      await this.runSend(pending.mapId, pending.files);
     } else {
       // Never got as far as an offer — reload maps and land on the normal
       // offer for the user to pick a map and Send.
@@ -658,7 +645,11 @@ class ToastCard {
     this.hideBar();
   }
 
-  private renderOutcome(card: OutcomeCard, mapId: number | null): void {
+  private renderOutcome(
+    card: OutcomeCard,
+    mapId: number | null,
+    trackIds: number[],
+  ): void {
     this.setPhase(card.tone === "error" ? "error" : "success");
     this.title.textContent = card.title;
 
@@ -696,7 +687,7 @@ class ToastCard {
     // Connect card instead, see renderSignIn.)
     const primary =
       card.showMapLink && mapId !== null
-        ? { href: successDeepLink(mapId), label: "Open your map" }
+        ? { href: successDeepLink(mapId, trackIds), label: "Open your map" }
         : null;
 
     if (primary) {
@@ -852,6 +843,17 @@ function isSameOrigin(rawUrl: string): boolean {
     return new URL(rawUrl).origin === location.origin;
   } catch {
     return false;
+  }
+}
+
+// The host (with port, if any) shown as the file's source. Falls back to the raw
+// string if it somehow doesn't parse — messages are validated before they reach
+// here, so that's belt-and-suspenders.
+function hostForDisplay(rawUrl: string): string {
+  try {
+    return new URL(rawUrl).host;
+  } catch {
+    return rawUrl;
   }
 }
 

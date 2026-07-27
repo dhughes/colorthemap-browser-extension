@@ -7,7 +7,6 @@ import {
   describeUploadOutcome,
   isCountdownElapsed,
   offerTitle,
-  originsNeedingPermission,
   pauseCountdown,
   resetCountdown,
   resolveInitialMapId,
@@ -175,52 +174,6 @@ describe("countdown", () => {
   });
 });
 
-describe("originsNeedingPermission", () => {
-  const PAGE = "https://trailhub.example";
-
-  it("returns the distinct cross-origin hosts that lack bytes", () => {
-    const origins = originsNeedingPermission(
-      [
-        file({ url: "https://a.example/x.gpx" }),
-        file({ url: "https://a.example/y.gpx" }), // same host — deduped
-        file({ url: "https://b.example/z.gpx" }),
-      ],
-      PAGE,
-    );
-    expect(origins).toEqual(["https://a.example/*", "https://b.example/*"]);
-  });
-
-  it("excludes same-origin files (the content script reads them)", () => {
-    expect(
-      originsNeedingPermission([file({ url: `${PAGE}/local.gpx` })], PAGE),
-    ).toEqual([]);
-  });
-
-  it("excludes files that already carry bytes", () => {
-    expect(
-      originsNeedingPermission(
-        [file({ url: "https://a.example/x.gpx", bytesBase64: "PGdweC8+" })],
-        PAGE,
-      ),
-    ).toEqual([]);
-  });
-
-  it("strips the port from the match pattern", () => {
-    expect(
-      originsNeedingPermission(
-        [file({ url: "http://127.0.0.1:8080/x.gpx" })],
-        PAGE,
-      ),
-    ).toEqual(["http://127.0.0.1/*"]);
-  });
-
-  it("skips an unparseable URL", () => {
-    expect(
-      originsNeedingPermission([file({ url: "not a url" })], PAGE),
-    ).toEqual([]);
-  });
-});
-
 describe("offerTitle", () => {
   it("reads naturally for one file", () => {
     expect(offerTitle(1)).toBe("Found a GPS file");
@@ -242,8 +195,18 @@ describe("sendButtonLabel", () => {
 });
 
 describe("successDeepLink", () => {
-  it("links to the map's page", () => {
-    expect(successDeepLink(42)).toMatch(/\/maps\/42$/);
+  it("frames the map on the tracks the send produced", () => {
+    expect(successDeepLink(42, [7, 8])).toMatch(/\/maps\/42\?tracks=7,8$/);
+  });
+
+  it("passes duplicate ids through — CTM resolves them to the canonical track", () => {
+    expect(successDeepLink(42, [12])).toMatch(/\?tracks=12$/);
+  });
+
+  // Nothing landed (or CTM named no tracks): a bare map link still beats a
+  // link that says "frame nothing", which lands with an empty selection.
+  it("falls back to the plain map page when there are no tracks", () => {
+    expect(successDeepLink(42, [])).toMatch(/\/maps\/42$/);
   });
 });
 
@@ -272,6 +235,7 @@ describe("describeUploadOutcome", () => {
     failed: 0,
     total: 0,
     errors: [],
+    trackIds: [],
     ...over,
   });
 
@@ -282,6 +246,38 @@ describe("describeUploadOutcome", () => {
     );
     expect(card.tone).toBe("success");
     expect(card.showMapLink).toBe(true);
+    expect(card.message).toBe("2 added");
+  });
+
+  it("names the file and its source host on a single-file success", () => {
+    const card = describeUploadOutcome(
+      done({ uploaded: 1, total: 1 }),
+      "Trails",
+      [{ filename: "valid.gpx", host: "ctm-files.test:8443" }],
+    );
+    expect(card.tone).toBe("success");
+    expect(card.message).toBe("valid.gpx — from ctm-files.test:8443");
+  });
+
+  it("names the file on a single-file duplicate too", () => {
+    const card = describeUploadOutcome(
+      done({ duplicates: 1, total: 1 }),
+      "Trails",
+      [{ filename: "valid.gpx", host: "ctm-files.test:8443" }],
+    );
+    expect(card.title.toLowerCase()).toContain("already");
+    expect(card.message).toBe("valid.gpx — from ctm-files.test:8443");
+  });
+
+  it("keeps the tally for a batch, where the counts still carry information", () => {
+    const card = describeUploadOutcome(
+      done({ uploaded: 2, total: 2 }),
+      "Trails",
+      [
+        { filename: "a.gpx", host: "example.com" },
+        { filename: "b.gpx", host: "example.com" },
+      ],
+    );
     expect(card.message).toBe("2 added");
   });
 
@@ -380,13 +376,6 @@ describe("translateFailureReason", () => {
   it("names a connection problem on a network failure", () => {
     const card = translateFailureReason("network");
     expect(card.message.toLowerCase()).toContain("connection");
-  });
-
-  it("explains a declined permission", () => {
-    const card = translateFailureReason("permission-denied");
-    expect(`${card.title} ${card.message}`.toLowerCase()).toContain(
-      "permission",
-    );
   });
 
   it("stays generic and friendly on a server or unknown failure", () => {

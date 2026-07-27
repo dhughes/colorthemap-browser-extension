@@ -50,13 +50,11 @@ export interface OpenToastMessage {
 // Why the batch (or the maps list) never got a real answer from CTM. Typed so
 // the toast can translate into friendly copy without string-sniffing; set by
 // the layer that saw the actual error (instanceof works there — it doesn't
-// survive the sendMessage boundary). "permission-denied" is produced
-// content-script-side only (a declined host-permission prompt).
+// survive the sendMessage boundary).
 export type UploadFailureReason =
   | "sign-in-required"
   | "network"
   | "server"
-  | "permission-denied"
   | "unknown";
 
 // Background SW → surface responses (returned via the sendMessage promise, the
@@ -68,7 +66,8 @@ export type ListMapsResult =
 // "done" means the batch was processed (CTM answered, or every file failed
 // local validation) — per-file outcomes live in the counts, with CTM's own
 // per-file error lines in `errors` (specific and actionable, kept verbatim).
-// "error" means a transport/auth failure stopped the whole batch.
+// `trackIds` is what the success card deep-links to. "error" means a
+// transport/auth failure stopped the whole batch.
 export type UploadResult =
   | {
       status: "done";
@@ -77,6 +76,7 @@ export type UploadResult =
       failed: number;
       total: number;
       errors: string[];
+      trackIds: number[];
     }
   | { status: "error"; reason: UploadFailureReason; detail?: string };
 

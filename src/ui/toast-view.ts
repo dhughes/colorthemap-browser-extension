@@ -53,34 +53,6 @@ export function addDetectedFile(
   return { files, added: false };
 }
 
-// Distinct origins the background must be granted to re-fetch: files that are
-// cross-origin to the page (the content script can't read them) and carry no
-// captured bytes. Same-origin files are read by the content script itself, and
-// files with bytes need nothing. Origins are scheme+host only — match patterns
-// can't carry a port.
-export function originsNeedingPermission(
-  files: DetectedFile[],
-  pageOrigin: string,
-): string[] {
-  const origins = new Set<string>();
-  for (const file of files) {
-    if (file.bytesBase64 !== undefined) {
-      continue;
-    }
-    let url: URL;
-    try {
-      url = new URL(file.url);
-    } catch {
-      continue; // unparseable — nothing to request
-    }
-    if (url.origin === pageOrigin) {
-      continue; // same-origin: the content script reads it
-    }
-    origins.add(`${url.protocol}//${url.hostname}/*`);
-  }
-  return [...origins];
-}
-
 // ─── Countdown ───────────────────────────────────────────────────────────────
 // A duration-agnostic drain timer, reused across the offer, sign-in, and
 // success windows (all 10s — see COUNTDOWN_MS in upload-toast.ts). Every
@@ -185,10 +157,17 @@ export function sendButtonLabel(fileCount: number): string {
   return fileCount === 1 ? "Send" : `Send all ${fileCount}`;
 }
 
-// The map's page on Color The Map. Client-side only — no server round-trip. #29
-// will extend this to center on the uploaded track once CTM supports it.
-export function successDeepLink(mapId: number): string {
-  return `${CTM_BASE_URL}/maps/${mapId}`;
+// The map's page on Color The Map, landing with this send's tracks selected and
+// the camera framed on them. Client-side only — no server round-trip.
+//
+// Duplicate ids are worth passing, not filtering: CTM resolves each id to the
+// track that represents it, so a re-import frames the activity already on the
+// map instead of dropping the id (color-the-map#1043). Without that resolution
+// the link would silently degrade to a bare map link, which is what it falls
+// back to here when a send produced no tracks at all.
+export function successDeepLink(mapId: number, trackIds: number[]): string {
+  const map = `${CTM_BASE_URL}/maps/${mapId}`;
+  return trackIds.length > 0 ? `${map}?tracks=${trackIds.join(",")}` : map;
 }
 
 // ─── Sign-in prompt ──────────────────────────────────────────────────────────
@@ -257,6 +236,23 @@ function outcomeTally(result: {
   return parts.join(" · ");
 }
 
+// What the card was offering, so a success can name it. A bare count ("1
+// added") is indistinguishable between cards, which makes a lingering success
+// card look like whichever send you just made — the exact confusion that made a
+// working SSRF block look like a bypass during #23's manual pass.
+export interface OutcomeSource {
+  filename: string;
+  host: string;
+}
+
+// A lone file's identity beats a tally that only restates the title: "1 added"
+// under "You're on the map" says nothing the title didn't. Batches keep the
+// tally, where the per-bucket counts do carry information.
+function successMessage(sources: OutcomeSource[], tally: string): string {
+  const only = sources.length === 1 ? sources[0] : undefined;
+  return only ? `${only.filename} — from ${only.host}` : tally;
+}
+
 // Turns an upload outcome into the card the toast shows, mimicking CTM's upload
 // receipt: a disposition (clean / issues / failed), a tally of the buckets, and
 // per-file reasons under failures. An "error" result (transport/auth failure)
@@ -264,6 +260,7 @@ function outcomeTally(result: {
 export function describeUploadOutcome(
   result: UploadResult,
   mapName: string,
+  sources: OutcomeSource[] = [],
 ): OutcomeCard {
   if (result.status === "error") {
     return translateFailureReason(result.reason, result.detail);
@@ -288,7 +285,7 @@ export function describeUploadOutcome(
     return {
       tone: "success",
       title: result.uploaded > 0 ? "You're on the map" : "Already on your map",
-      message: tally,
+      message: successMessage(sources, tally),
       details: [],
       showMapLink: true,
     };
@@ -351,15 +348,6 @@ export function translateFailureReason(
         tone: "error",
         title: "Couldn't reach Color The Map",
         message: "Check your connection and give it another try.",
-        details: [],
-        showMapLink: false,
-      };
-    case "permission-denied":
-      return {
-        tone: "error",
-        title: "Permission needed",
-        message:
-          "Color The Map needs your OK to read that file. Try again to allow it.",
         details: [],
         showMapLink: false,
       };
